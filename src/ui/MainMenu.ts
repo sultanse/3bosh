@@ -1,15 +1,17 @@
 import { Control } from "@babylonjs/gui/2D/controls/control";
 import { StackPanel } from "@babylonjs/gui/2D/controls/stackPanel";
+import { AudioSettingsPanel, type AudioSettingsPanelOptions } from "./AudioSettingsPanel";
 import type { UiRoot } from "./UiRoot";
 
 export interface MainMenuCallbacks {
   readonly start: () => void;
-  readonly clearSavedData: () => void;
+  readonly audio: AudioSettingsPanelOptions;
 }
 
 export class MainMenu {
   private readonly panel: StackPanel;
   private readonly settings: StackPanel;
+  private readonly audio: AudioSettingsPanel;
 
   public constructor(root: UiRoot, callbacks: MainMenuCallbacks) {
     this.panel = root.createPanel("main-menu");
@@ -32,12 +34,13 @@ export class MainMenu {
     audioTitle.height = "38px";
     audioTitle.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     root.add(this.settings, audioTitle);
-    root.add(this.settings, root.createButton("clear-saved-data", root.localization.t("clearSavedData"), callbacks.clearSavedData));
+    this.audio = new AudioSettingsPanel(root, this.settings, callbacks.audio);
     root.add(this.settings, root.createButton("close-settings", root.localization.t("returnToMenu"), () => this.hideSettings()));
     this.settings.isVisible = false;
   }
 
   public dispose(): void {
+    this.audio.dispose();
     this.panel.isVisible = false;
     this.settings.isVisible = false;
   }

@@ -1,8 +1,10 @@
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { Button } from "@babylonjs/gui/2D/controls/button";
+import { Checkbox } from "@babylonjs/gui/2D/controls/checkbox";
 import { Control } from "@babylonjs/gui/2D/controls/control";
 import { Ellipse } from "@babylonjs/gui/2D/controls/ellipse";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
+import { Slider } from "@babylonjs/gui/2D/controls/sliders/slider";
 import { StackPanel } from "@babylonjs/gui/2D/controls/stackPanel";
 import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
 import type { Scene } from "@babylonjs/core/scene";
@@ -14,6 +16,7 @@ export interface UiControlDiagnostic {
   readonly visible: boolean;
   readonly pixelBounds: Readonly<{ x: number; y: number; width: number; height: number }>;
   readonly lineCount?: number;
+  readonly value?: number;
 }
 
 export interface UiDiagnosticsSnapshot {
@@ -22,7 +25,7 @@ export interface UiDiagnosticsSnapshot {
   readonly controls: readonly UiControlDiagnostic[];
 }
 
-type DiagnosticControl = TextBlock | Button | Rectangle | StackPanel | Ellipse;
+type DiagnosticControl = TextBlock | Button | Checkbox | Rectangle | Slider | StackPanel | Ellipse;
 
 interface RegisteredControl {
   readonly id: string;
@@ -120,6 +123,8 @@ export class UiRoot {
           height: control._currentMeasure.height,
         },
         ...(control instanceof TextBlock ? { lineCount: control.lines?.length ?? 0 } : {}),
+        ...(control instanceof Slider ? { value: control.value } : {}),
+        ...(control instanceof Checkbox ? { value: control.isChecked ? 1 : 0 } : {}),
       })),
     };
   }
@@ -130,11 +135,24 @@ export class UiRoot {
     const registered = this.controls.get(id);
     if (registered === undefined) return false;
     const { control } = registered;
-    if (!this.isEffectivelyVisible(control)) return false;
-    const measure = control._currentMeasure;
-    if (measure.width <= 0 || measure.height <= 0) return false;
+    if (!this.canInteract(control)) return false;
     action();
     return true;
+  }
+
+  public setValue(id: string, value: number): boolean {
+    if (!Number.isFinite(value)) return false;
+    const registered = this.controls.get(id);
+    if (registered === undefined || !this.canInteract(registered.control)) return false;
+    if (registered.control instanceof Slider) {
+      registered.control.value = Math.min(registered.control.maximum, Math.max(registered.control.minimum, value));
+      return true;
+    }
+    if (registered.control instanceof Checkbox) {
+      registered.control.isChecked = value >= 0.5;
+      return true;
+    }
+    return false;
   }
 
   public dispose(): void {
@@ -159,6 +177,11 @@ export class UiRoot {
       node = node.parent;
     }
     return true;
+  }
+
+  private canInteract(control: Control): boolean {
+    const measure = control._currentMeasure;
+    return this.isEffectivelyVisible(control) && measure.width > 0 && measure.height > 0;
   }
 
   private rtlHorizontalAlignment(): number {

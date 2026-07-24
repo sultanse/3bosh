@@ -5,6 +5,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scene } from "@babylonjs/core/scene";
 import type { ManagedScene } from "../app/SceneRouter";
 import type { LocalizationService } from "../services/LocalizationService";
+import type { AudioSettingsPanelOptions } from "../ui/AudioSettingsPanel";
 import { MainMenu } from "../ui/MainMenu";
 import { ErrorScreen } from "../ui/ErrorScreen";
 import { UiRoot } from "../ui/UiRoot";
@@ -12,7 +13,7 @@ import { UiRoot } from "../ui/UiRoot";
 export interface MenuSceneOptions {
   readonly localization: LocalizationService;
   readonly start: () => void;
-  readonly clearSavedData: () => void;
+  readonly audio: AudioSettingsPanelOptions;
   readonly retry?: () => void;
 }
 
@@ -29,7 +30,7 @@ export class MenuScene implements ManagedScene {
     this.ui = new UiRoot(this.scene, options.localization);
     this.menu = new MainMenu(this.ui, {
       start: options.start,
-      clearSavedData: options.clearSavedData,
+      audio: options.audio,
     });
     if (options.retry !== undefined) new ErrorScreen(this.ui, options.retry);
   }

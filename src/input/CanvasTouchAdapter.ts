@@ -1,20 +1,28 @@
 import type { TouchZone, TouchZoneProvider } from "../ui/MobileControls";
 import type { TouchInputSource } from "./TouchInputSource";
 
+export interface PointerSurface extends EventTarget {
+  getBoundingClientRect(): Readonly<{ left: number; top: number; width: number; height: number }>;
+}
+
+export interface VisibilityTarget extends EventTarget {
+  readonly visibilityState: DocumentVisibilityState;
+}
+
 export interface CanvasTouchAdapterOptions {
   readonly blurTarget?: EventTarget;
-  readonly visibilityTarget?: Document;
+  readonly visibilityTarget?: VisibilityTarget;
 }
 
 export class CanvasTouchAdapter {
   private readonly activeZones = new Map<number, TouchZone["id"]>();
   private readonly blurTarget: EventTarget;
-  private readonly visibilityTarget: Document | undefined;
+  private readonly visibilityTarget: VisibilityTarget | undefined;
   private disposed = false;
 
-  private readonly pointerDownListener = (event: PointerEvent): void => this.onPointerDown(event);
-  private readonly pointerMoveListener = (event: PointerEvent): void => this.onPointerMove(event);
-  private readonly pointerUpListener = (event: PointerEvent): void => this.onPointerRelease(event);
+  private readonly pointerDownListener = (event: Event): void => this.onPointerDown(event as PointerEvent);
+  private readonly pointerMoveListener = (event: Event): void => this.onPointerMove(event as PointerEvent);
+  private readonly pointerUpListener = (event: Event): void => this.onPointerRelease(event as PointerEvent);
   private readonly blurListener = (): void => this.cancelAll();
   private readonly visibilityListener = (): void => {
     if (this.visibilityTarget?.visibilityState === "hidden") {
@@ -23,7 +31,7 @@ export class CanvasTouchAdapter {
   };
 
   public constructor(
-    private readonly canvas: HTMLCanvasElement,
+    private readonly canvas: PointerSurface,
     private readonly zoneProvider: TouchZoneProvider,
     private readonly touch: TouchInputSource,
     options: CanvasTouchAdapterOptions = {},

@@ -64,6 +64,7 @@ interface Window {
   __GAME_UI_HARNESS__?: {
     diagnostics(): import("./app/GameApp").GameUiHarnessDiagnostics;
     activate(id: string): boolean;
+    setValue(id: string, value: number): boolean;
     forceVictory(): void;
     forceGameOver(): void;
     forceDamage(): void;

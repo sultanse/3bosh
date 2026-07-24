@@ -33,6 +33,8 @@ export const en: TranslationDictionary = {
   audioMute: "Mute",
   clearData: "Clear Data",
   clearDataConfirm: "Clear all saved data?",
+  confirmClearData: "Confirm Clear",
+  cancelClearData: "Cancel",
   controlLeft: "Left",
   controlRight: "Right",
   controlJump: "Jump",

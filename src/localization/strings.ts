@@ -31,6 +31,8 @@ export const STRINGS = {
   audioMute: "audioMute",
   clearData: "clearData",
   clearDataConfirm: "clearDataConfirm",
+  confirmClearData: "confirmClearData",
+  cancelClearData: "cancelClearData",
   controlLeft: "controlLeft",
   controlRight: "controlRight",
   controlJump: "controlJump",

@@ -7,6 +7,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scene } from "@babylonjs/core/scene";
 import { DeterministicTestEngine } from "../dev/DeterministicTestEngine";
 import { GameTestHarness } from "../dev/GameTestHarness";
+import { TypedEventBus, type GameEvents } from "../core/TypedEventBus";
 import { LevelUi } from "../ui/LevelUi";
 import { MobileControls } from "../ui/MobileControls";
 import { CanvasTouchAdapter } from "../input/CanvasTouchAdapter";
@@ -19,6 +20,8 @@ import { MenuScene } from "../scenes/MenuScene";
 import { LoadingScene } from "../scenes/LoadingScene";
 import { PhysicsProbeScene } from "../scenes/PhysicsProbeScene";
 import { GameFlowMachine, type GameFlowState } from "./GameFlowMachine";
+import { GameSession } from "./GameSession";
+import { AppAudioController } from "./AppAudioController";
 import { SceneRouter, type ManagedScene } from "./SceneRouter";
 
 export interface GameAppOptions {
@@ -30,6 +33,7 @@ interface RenderableScene extends ManagedScene {
   readonly uiSnapshot?: UiDiagnosticsSnapshot;
   readonly level?: LevelScene;
   invokeUi?(id: string): boolean;
+  setUiValue?(id: string, value: number): boolean;
 }
 
 const engineOptions: EngineOptions = {
@@ -46,6 +50,9 @@ export class GameApp {
   private readonly flow = new GameFlowMachine("boot");
   private readonly saves = new SaveService(window.localStorage);
   private readonly localization = new LocalizationService(this.saves.load().locale);
+  private readonly events = new TypedEventBus<GameEvents>();
+  private readonly session = new GameSession(this.flow, this.saves, this.events);
+  private readonly audio = new AppAudioController(this.session, this.saves);
   private engine: AbstractEngine | undefined;
   private scene: Scene | undefined;
   private router: SceneRouter | undefined;
@@ -60,6 +67,7 @@ export class GameApp {
 
   public async start(): Promise<void> {
     if (this.engine) return;
+    this.audio.start();
 
     const query = new URLSearchParams(window.location.search);
     const probe = query.get("probe");
@@ -92,6 +100,8 @@ export class GameApp {
 
   public dispose(): void {
     const { engine, scene } = this;
+    this.audio.dispose();
+    this.events.dispose();
     if (!engine) return;
     window.removeEventListener("resize", this.handleResize);
     engine.stopRenderLoop();
@@ -169,6 +179,7 @@ export class GameApp {
     let level: LevelScene | undefined;
     let ui: LevelUi | undefined;
     let restartSubscription: { dispose(): void } | undefined;
+    let audioSubscription: { dispose(): void } | undefined;
     try {
       level = await LevelScene.create(scene, { testMode: false });
       if (signal.aborted) throw new DOMException("Navigation aborted", "AbortError");
@@ -178,6 +189,7 @@ export class GameApp {
         restart: () => this.requestStartLevel(),
         menu: () => { void this.showMenu(); },
       });
+      audioSubscription = this.audio.bindLevel(level.gameEvents);
       restartSubscription = level.onEvent("restartRequested", () => this.requestStartLevel());
       const boundLevel = level;
       const boundUi = ui;
@@ -191,6 +203,7 @@ export class GameApp {
         level: boundLevel,
         get uiSnapshot() { return boundUi.root.snapshot(); },
         invokeUi: (id) => boundUi.root.invoke(id),
+        setUiValue: (id, value) => boundUi.root.setValue(id, value),
         render: () => {
           this.syncFlow(boundLevel);
           boundUi.sync(boundLevel.flowState);
@@ -199,6 +212,7 @@ export class GameApp {
         dispose: () => {
           touchAdapter?.dispose();
           mobileControls.dispose();
+          audioSubscription?.dispose();
           restartSubscription?.dispose();
           boundUi.dispose();
           boundLevel.dispose();
@@ -206,6 +220,7 @@ export class GameApp {
         },
       };
     } catch (error: unknown) {
+      audioSubscription?.dispose();
       restartSubscription?.dispose();
       ui?.dispose();
       level?.dispose();
@@ -218,7 +233,7 @@ export class GameApp {
     const menuOptions = {
       localization: this.localization,
       start: () => this.requestStartLevel(),
-      clearSavedData: () => this.saves.clear(),
+      audio: this.audio.settingsPanelOptions(),
       ...(this.loadError ? { retry: () => this.requestStartLevel() } : {}),
     };
     const menu = await MenuScene.create(engine, menuOptions, signal);
@@ -226,6 +241,7 @@ export class GameApp {
       name: menu.name,
       get uiSnapshot() { return menu.ui.snapshot(); },
       invokeUi: (id) => menu.ui.invoke(id),
+      setUiValue: (id, value) => menu.ui.setValue(id, value),
       render: () => menu.render(),
       dispose: () => menu.dispose(),
     };
@@ -234,6 +250,8 @@ export class GameApp {
   private async startLevel(): Promise<void> {
     if (!this.router) return;
     if (this.flow.state === "loadingLevel") return;
+    this.audio.setPaused(false);
+    this.audio.playMusic();
     this.loadError = undefined;
     if (this.flow.state === "menu" || this.flow.state === "victory" || this.flow.state === "gameOver" || this.flow.state === "playing" || this.flow.state === "paused") {
       this.flow.transition("loadingLevel");
@@ -260,6 +278,8 @@ export class GameApp {
 
   private async showMenu(): Promise<void> {
     if (!this.router) return;
+    this.audio.setPaused(false);
+    this.audio.playMusic();
     if (this.flow.state === "paused") this.flow.transition("menu");
     else if (this.flow.state === "victory" || this.flow.state === "gameOver" || this.flow.state === "loadingLevel") this.flow.transition("menu");
     await this.router.goTo("menu");
@@ -268,12 +288,14 @@ export class GameApp {
   private resumeLevel(): void {
     const level = this.activeScene()?.level;
     level?.resume();
+    this.audio.setPaused(false);
     if (this.flow.state === "paused") this.flow.transition("playing");
   }
 
   private pauseLevel(): void {
     const level = this.activeScene()?.level;
     level?.pause();
+    this.audio.setPaused(true);
     if (this.flow.state === "playing") this.flow.transition("paused");
   }
 
@@ -284,6 +306,7 @@ export class GameApp {
       this.flow.transition(state);
     } else if (this.flow.state === "paused" && state === "playing") {
       this.flow.transition("playing");
+      this.audio.setPaused(false);
     }
   }
 
@@ -307,6 +330,7 @@ export class GameApp {
     window.__GAME_UI_HARNESS__ = {
       diagnostics: () => ({ flowState: this.flow.state, ui: this.activeScene()?.uiSnapshot }),
       activate: (id) => this.activeScene()?.invokeUi?.(id) ?? false,
+      setValue: (id, value) => this.activeScene()?.setUiValue?.(id, value) ?? false,
       forceVictory: () => this.activeScene()?.level?.reachGoal(),
       forceGameOver: () => {
         const level = this.activeScene()?.level;

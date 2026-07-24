@@ -7,6 +7,11 @@ const label = async (page: import("@playwright/test").Page, id: string): Promise
   page.evaluate((controlId) => window.__GAME_UI_HARNESS__?.diagnostics().ui?.controls.find((control) => control.id === controlId)?.text, id);
 const isVisible = async (page: import("@playwright/test").Page, id: string): Promise<boolean | undefined> =>
   page.evaluate((controlId) => window.__GAME_UI_HARNESS__?.diagnostics().ui?.controls.find((control) => control.id === controlId)?.visible, id);
+const setValue = (page: import("@playwright/test").Page, id: string, value: number) =>
+  page.evaluate(
+    ({ controlId, controlValue }) => window.__GAME_UI_HARNESS__?.setValue(controlId, controlValue),
+    { controlId: id, controlValue: value },
+  );
 
 test("the Arabic game UI routes menu, pause, restart, victory and game-over actions", async ({ page }) => {
   await page.goto("/");
@@ -17,7 +22,20 @@ test("the Arabic game UI routes menu, pause, restart, victory and game-over acti
   expect(await activate(page, "open-settings")).toBe(true);
   expect(await label(page, "clear-saved-data")).toBe("مسح البيانات المحفوظة");
   expect(await label(page, "close-settings")).toBe("القائمة الرئيسية");
+  expect(await setValue(page, "music-volume", 0.25)).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem("3bosh.save"))).not.toBeNull();
+
   expect(await activate(page, "clear-saved-data")).toBe(true);
+  expect(await label(page, "clear-data-confirmation-message")).toBe("هل تريد مسح البيانات المحفوظة؟");
+  expect(await isVisible(page, "clear-data-confirmation")).toBe(true);
+  expect(await activate(page, "close-settings")).toBe(false);
+  expect(await activate(page, "cancel-clear-data")).toBe(true);
+  expect(await isVisible(page, "clear-data-confirmation")).toBe(false);
+  expect(await page.evaluate(() => window.localStorage.getItem("3bosh.save"))).not.toBeNull();
+
+  expect(await activate(page, "clear-saved-data")).toBe(true);
+  expect(await activate(page, "confirm-clear-data")).toBe(true);
+  expect(await page.evaluate(() => window.localStorage.getItem("3bosh.save"))).toBeNull();
   expect(await activate(page, "close-settings")).toBe(true);
   expect(await label(page, "start-game")).toBe("ابدأ اللعب");
   expect((await page.screenshot()).byteLength).toBeGreaterThan(1_000);
