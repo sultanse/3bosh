@@ -17,7 +17,7 @@ export interface PlayerHealthEvents {
 }
 
 export interface PlayerHealthOptions {
-  readonly controller?: Pick<PlayerController, "enterHurt" | "markDead" | "revive">;
+  readonly controller?: Pick<PlayerController, "enterHurt" | "markDead" | "revive" | "clearHurtForRespawn">;
   readonly events?: Partial<PlayerHealthEvents>;
 }
 
@@ -109,6 +109,11 @@ export class PlayerHealth {
     this.contactInvulnerableUntil = Number.NEGATIVE_INFINITY;
     this.options.controller?.revive();
     this.options.events?.healthChanged?.(this.health, this.maxHealth);
+  }
+
+  /** Clears a hurt/dead controller state without replenishing health. */
+  public resumeAfterRespawn(): void {
+    this.options.controller?.clearHurtForRespawn();
   }
 
   public get current(): number {

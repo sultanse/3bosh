@@ -10,6 +10,11 @@ export interface PlayerDiagnostic {
   readonly fixedSteps: number;
   readonly jumpApexY: number;
   readonly fixedStep180?: { readonly x: number; readonly jumpApexY: number };
+  readonly health?: number;
+  readonly activeCheckpointId?: string | null;
+  readonly respawnProtected?: boolean;
+  readonly flowState?: import("../app/GameFlowMachine").GameFlowState;
+  readonly lastRespawn?: { readonly x: number; readonly y: number; readonly velocityX: number; readonly velocityY: number };
 }
 
 export interface GameTestTarget {

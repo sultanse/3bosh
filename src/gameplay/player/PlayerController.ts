@@ -136,6 +136,10 @@ export class PlayerController {
     if (this.dead) {
       return;
     }
+    this.clearHurtForRespawn();
+  }
+
+  public clearHurtForRespawn(): void {
     this.dead = false;
     this.hurtUntilSeconds = null;
     this.resetMotion();

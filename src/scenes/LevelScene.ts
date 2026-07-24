@@ -10,6 +10,8 @@ import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugi
 import type { Scene } from "@babylonjs/core/scene";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { GAME_CONFIG } from "../config/GameConfig";
+import { GameFlowMachine } from "../app/GameFlowMachine";
+import { LevelSession } from "../app/LevelSession";
 import {
   GameTestInputSource,
   type GameTestTarget,
@@ -23,6 +25,8 @@ import {
 } from "../gameplay/player/PlayerController";
 import { PlayerHealth } from "../gameplay/player/PlayerHealth";
 import { PlayerView } from "../gameplay/player/PlayerView";
+import { LevelBuilder, type BuiltLevel } from "../gameplay/level/LevelBuilder";
+import { LEVEL_ONE } from "../gameplay/level/LevelOne";
 import type { InputSnapshot } from "../input/InputAction";
 import { InputManager } from "../input/InputManager";
 import { KeyboardInputSource } from "../input/KeyboardInputSource";
@@ -37,8 +41,6 @@ export interface LevelSceneOptions {
   readonly testMode: boolean;
 }
 
-const LEVEL_BOUNDS = { minX: -14, maxX: 30, minY: -2, maxY: 12 } as const;
-
 const applyWorldFilter = (aggregate: PhysicsAggregate): void => {
   aggregate.shape.filterMembershipMask = CollisionLayer.world;
   aggregate.shape.filterCollideMask = CollisionMask.world;
@@ -52,6 +54,10 @@ export class LevelScene implements GameTestTarget {
   private readonly camera: SideCameraController;
   private readonly health: PlayerHealth;
   private readonly events = new TypedEventBus<GameEvents>();
+  private readonly levelSession: LevelSession;
+  private readonly level: BuiltLevel;
+  private readonly flow = new GameFlowMachine("loadingLevel");
+  private readonly playerBoundsProxy: ReturnType<typeof MeshBuilder.CreateBox>;
   private readonly testInput: GameTestInputSource | undefined;
   private readonly beforeStepObserver: Observer<Scene>;
   private readonly afterStepObserver: Observer<Scene>;
@@ -65,6 +71,7 @@ export class LevelScene implements GameTestTarget {
   private playerFacing: -1 | 1 = 1;
   private queuedJumpKind: PlayerMotorCommand["jumpKind"] = null;
   private previousAspect = 0;
+  private lastRespawn: { readonly x: number; readonly y: number; readonly velocityX: number; readonly velocityY: number } | undefined;
   private disposed = false;
 
   private constructor(
@@ -78,7 +85,22 @@ export class LevelScene implements GameTestTarget {
     const keyboard = new KeyboardInputSource();
     this.input = new InputManager(this.testInput ? [keyboard, this.testInput] : [keyboard]);
     this.createEnvironment();
-    this.adapter = PhysicsCharacterAdapter.create(scene, new Vector3(0, 1, GAME_CONFIG.gameplayZ));
+    this.level = LevelBuilder.build(scene, LEVEL_ONE);
+    this.adapter = PhysicsCharacterAdapter.create(
+      scene,
+      new Vector3(LEVEL_ONE.spawn.x, LEVEL_ONE.spawn.y, LEVEL_ONE.spawn.z),
+    );
+    this.levelSession = new LevelSession(
+      { id: "spawn-sunset-workshop", position: LEVEL_ONE.spawn },
+      this.events,
+    );
+    this.flow.transition("playing");
+    this.playerBoundsProxy = MeshBuilder.CreateBox(
+      "player-trigger-proxy",
+      { width: GAME_CONFIG.player.radius * 2, height: GAME_CONFIG.player.height, depth: GAME_CONFIG.player.radius * 2 },
+      scene,
+    );
+    this.playerBoundsProxy.isVisible = false;
     this.playerView = new PlayerView(scene);
     this.health = new PlayerHealth(
       GAME_CONFIG.player.maxHealth,
@@ -98,7 +120,7 @@ export class LevelScene implements GameTestTarget {
     const aspect = scene.getEngine().getRenderWidth() / Math.max(1, scene.getEngine().getRenderHeight());
     this.previousAspect = aspect;
     this.camera = new SideCameraController({
-      bounds: LEVEL_BOUNDS,
+      bounds: LEVEL_ONE.cameraBounds,
       center: cameraCenter,
       halfWidth: (GAME_CONFIG.camera.verticalSize / 2) * aspect,
       halfHeight: GAME_CONFIG.camera.verticalSize / 2,
@@ -129,6 +151,11 @@ export class LevelScene implements GameTestTarget {
         fixedSteps: this.fixedSteps,
         jumpApexY: Number.isFinite(this.jumpApexY) ? this.jumpApexY : 0,
         ...(this.fixedStep180 ? { fixedStep180: this.fixedStep180 } : {}),
+        health: this.health.current,
+        activeCheckpointId: this.levelSession.snapshot.activeCheckpointId,
+        respawnProtected: this.elapsedSeconds < this.respawnProtectionUntil,
+        flowState: this.flow.state,
+        ...(this.lastRespawn ? { lastRespawn: this.lastRespawn } : {}),
       };
     };
   }
@@ -143,18 +170,23 @@ export class LevelScene implements GameTestTarget {
   }
 
   public forceFall(): void {
-    this.health.damage(1, "fall", this.elapsedSeconds);
-    this.adapter.setPosition(new Vector3(0, GAME_CONFIG.fallThresholdY - 1, GAME_CONFIG.gameplayZ));
+    this.adapter.setPosition(new Vector3(0, LEVEL_ONE.fallThresholdY - 1, GAME_CONFIG.gameplayZ));
     this.adapter.resetVelocity();
+    this.handleDamage("fall");
   }
 
-  public activateCheckpoint(): void {}
+  public activateCheckpoint(): void {
+    const checkpoint = this.level.checkpoints[0];
+    if (checkpoint) this.activateCheckpointById(checkpoint.id);
+  }
 
   public defeatEnemy(): void {}
 
   public collectItem(): void {}
 
-  public reachGoal(): void {}
+  public reachGoal(): void {
+    if (this.levelSession.completeGoal() && this.flow.state === "playing") this.flow.transition("victory");
+  }
 
   public startFixedMovementScenario(): void {
     this.fixedSteps = 0;
@@ -178,6 +210,8 @@ export class LevelScene implements GameTestTarget {
     this.input.dispose();
     this.events.dispose();
     this.playerView.dispose();
+    this.playerBoundsProxy.dispose();
+    this.level.dispose();
     this.adapter.dispose();
   }
 
@@ -188,12 +222,8 @@ export class LevelScene implements GameTestTarget {
     new HemisphericLight("level-fill", Vector3.Up(), this.scene).intensity = 0.55;
     new ShadowGenerator(512, sunlight);
 
-    this.createStaticBox("level-ground", 40, 1, 2, 8, -0.5);
-    this.createStaticBox("level-platform-one", 4, 0.5, 2, 7, 2.2);
-    this.createStaticBox("level-platform-two", 3.5, 0.5, 2, 13, 4.4);
-    this.createStaticBox("level-platform-three", 4.5, 0.5, 2, 20, 2.8);
     for (const z of [-1.5, 1.5]) {
-      const wall = this.createStaticBox(`level-depth-wall-${z}`, 48, 14, 0.1, 8, 5, z);
+      const wall = this.createStaticBox(`level-depth-wall-${z}`, 132, 20, 0.1, 61, 5, z);
       wall.isVisible = false;
     }
   }
@@ -214,8 +244,10 @@ export class LevelScene implements GameTestTarget {
   }
 
   private beforeFixedStep(): void {
+    if (this.flow.state !== "playing") return;
     this.fixedSteps += 1;
     this.elapsedSeconds += GAME_CONFIG.fixedStepSeconds;
+    this.level.updateMovingPlatforms(GAME_CONFIG.fixedStepSeconds);
     if (this.fixedSteps === this.scheduledJumpAtStep) {
       this.testInput?.set({ jumpPressed: true });
       this.scheduledJumpAtStep = undefined;
@@ -239,6 +271,7 @@ export class LevelScene implements GameTestTarget {
   }
 
   private afterFixedStep(): void {
+    if (this.flow.state !== "playing") return;
     const jumpKind = this.queuedJumpKind;
     this.queuedJumpKind = null;
     if (jumpKind !== null) {
@@ -251,6 +284,8 @@ export class LevelScene implements GameTestTarget {
       this.fixedStep180 = { x: motion.position.x, jumpApexY: this.jumpApexY };
     }
     this.playerView.setPosition(motion.position);
+    this.playerBoundsProxy.position.copyFrom(motion.position);
+    this.playerBoundsProxy.computeWorldMatrix(true);
     this.playerView.setFacing(this.playerFacing === -1 ? "left" : "right");
     this.playerView.setState(this.controller.stateMachine.state);
     this.playerView.update(GAME_CONFIG.fixedStepSeconds);
@@ -259,6 +294,61 @@ export class LevelScene implements GameTestTarget {
       this.previousAspect = aspect;
       this.camera.resize(aspect, GAME_CONFIG.camera.verticalSize);
     }
-    this.camera.update(motion.position, GAME_CONFIG.fixedStepSeconds);
+    const cameraCenter = this.camera.update(motion.position, GAME_CONFIG.fixedStepSeconds);
+    this.level.parallax.update(cameraCenter.x);
+    this.processLevelTriggers();
+  }
+
+  private respawnProtectionUntil = Number.NEGATIVE_INFINITY;
+
+  private processLevelTriggers(): void {
+    if ((this.lastMotion?.position.y ?? 0) < LEVEL_ONE.fallThresholdY) {
+      this.handleDamage("fall");
+      return;
+    }
+    for (const hazard of this.level.hazards) {
+      if (hazard.update(this.playerBoundsProxy.getBoundingInfo())) {
+        this.handleDamage("fall");
+        return;
+      }
+    }
+    for (const checkpoint of this.level.checkpoints) {
+      if (checkpoint.update(this.playerBoundsProxy.getBoundingInfo())) this.activateCheckpointById(checkpoint.id);
+    }
+    for (const goal of this.level.goals) {
+      if (goal.update(this.playerBoundsProxy.getBoundingInfo()) && this.levelSession.completeGoal()) {
+        this.flow.transition("victory");
+        return;
+      }
+    }
+  }
+
+  private activateCheckpointById(checkpointId: string): void {
+    const checkpoint = this.level.checkpoints.find((entry) => entry.id === checkpointId);
+    if (!checkpoint) return;
+    this.levelSession.activateCheckpoint({
+      id: checkpoint.id,
+      position: checkpoint.definition.respawnPosition,
+    });
+  }
+
+  private handleDamage(source: "fall"): void {
+    if (this.flow.state !== "playing") return;
+    const outcome = this.health.damage(1, source, this.elapsedSeconds);
+    if (!outcome.applied) return;
+    this.playerView.flashDamage(0.2);
+    if (outcome.died) {
+      this.flow.transition("gameOver");
+      return;
+    }
+    const respawn = this.levelSession.snapshot.activeCheckpointPosition;
+    this.controller.resetMotion();
+    this.health.resumeAfterRespawn();
+    this.adapter.setPosition(new Vector3(respawn.x, respawn.y, respawn.z));
+    this.adapter.resetVelocity();
+    this.lastRespawn = { x: respawn.x, y: respawn.y, velocityX: 0, velocityY: 0 };
+    this.respawnProtectionUntil = this.elapsedSeconds + GAME_CONFIG.player.respawnProtectionSeconds;
+    this.health.grantInvulnerability(GAME_CONFIG.player.respawnProtectionSeconds, this.elapsedSeconds);
+    this.events.emit("playerRespawned", { x: respawn.x, y: respawn.y });
   }
 }
