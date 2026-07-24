@@ -14,10 +14,11 @@ for (const renderFps of [30, 60, 120] as const) {
         page.evaluate(() => window.__GAME_DIAGNOSTICS__?.physicsProbe),
       )
       .toMatchObject({
-        supported: true,
         grounded: true,
         zDriftWithinTolerance: true,
         movingPlatformCarry: true,
+        platformRideTicks: 60,
+        platformRelativeOffsetWithinTolerance: true,
         enemyTriggerEntered: true,
         enemyTriggerExited: true,
         duplicateTriggerEvents: false,

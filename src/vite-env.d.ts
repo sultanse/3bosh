@@ -5,6 +5,8 @@ interface PhysicsProbeDiagnostics {
   readonly grounded: boolean;
   readonly zDriftWithinTolerance: boolean;
   readonly movingPlatformCarry: boolean;
+  readonly platformRideTicks: number;
+  readonly platformRelativeOffsetWithinTolerance: boolean;
   readonly enemyTriggerEntered: boolean;
   readonly enemyTriggerExited: boolean;
   readonly duplicateTriggerEvents: boolean;

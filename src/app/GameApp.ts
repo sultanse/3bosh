@@ -64,6 +64,7 @@ export class GameApp {
       }
     } catch (error: unknown) {
       boot.markFailed();
+      this.dispose();
       throw error;
     }
   }
