@@ -28,13 +28,15 @@ test("RTL HUD and end controls stay contained with tutorial text wrapped", async
   const diagnostic = await page.evaluate(() => window.__GAME_UI_HARNESS__?.diagnostics().ui);
   expect(diagnostic?.direction).toBe("rtl");
   const controls = diagnostic?.controls ?? [];
-  const hud = [visible(controls, "hud-health"), visible(controls, "hud-score"), visible(controls, "hud-collectibles")];
-  for (const control of hud) {
+  const health = visible(controls, "hud-health");
+  const score = visible(controls, "hud-score");
+  const collectibles = visible(controls, "hud-collectibles");
+  for (const control of [health, score, collectibles]) {
     expect(control.visible).toBe(true);
     expectContained(control, diagnostic?.viewport ?? { width: 0, height: 0 });
   }
-  expect(overlaps(hud[0]!.pixelBounds, hud[1]!.pixelBounds)).toBe(false);
-  expect(overlaps(hud[1]!.pixelBounds, hud[2]!.pixelBounds)).toBe(false);
+  expect(overlaps(health.pixelBounds, score.pixelBounds)).toBe(false);
+  expect(overlaps(score.pixelBounds, collectibles.pixelBounds)).toBe(false);
   await page.evaluate(() => window.__GAME_UI_HARNESS__?.forceDamage());
   await expect.poll(() => page.evaluate(() => window.__GAME_UI_HARNESS__?.diagnostics().ui?.controls.find((control) => control.id === "hud-damage-flash")?.visible)).toBe(true);
   const flash = visible((await page.evaluate(() => window.__GAME_UI_HARNESS__?.diagnostics().ui))?.controls ?? [], "hud-damage-flash");

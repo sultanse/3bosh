@@ -111,7 +111,7 @@ export class UiRoot {
       controls: [...this.controls.values()].map(({ id, control, text }) => ({
         id,
         text: text(),
-        visible: control.isVisible,
+        visible: this.isEffectivelyVisible(control),
         pixelBounds: {
           x: control._currentMeasure.left,
           y: control._currentMeasure.top,
@@ -126,6 +126,12 @@ export class UiRoot {
   public invoke(id: string): boolean {
     const action = this.actions.get(id);
     if (action === undefined) return false;
+    const registered = this.controls.get(id);
+    if (registered === undefined) return false;
+    const { control } = registered;
+    if (!this.isEffectivelyVisible(control)) return false;
+    const measure = control._currentMeasure;
+    if (measure.width <= 0 || measure.height <= 0) return false;
     action();
     return true;
   }
@@ -143,6 +149,15 @@ export class UiRoot {
       throw new Error(`Duplicate GUI control id: ${id}`);
     }
     this.controls.set(id, { id, control, text });
+  }
+
+  private isEffectivelyVisible(control: Control): boolean {
+    let node: Control | null | undefined = control;
+    while (node) {
+      if (!node.isVisible) return false;
+      node = node.parent;
+    }
+    return true;
   }
 
   private rtlHorizontalAlignment(): number {

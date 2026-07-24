@@ -55,6 +55,45 @@ test("the Arabic game UI routes menu, pause, restart, victory and game-over acti
   await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
 });
 
+test("activating a checkpoint keeps the collectibles readout intact", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("[data-boot-status]")).toHaveAttribute("data-boot-status", "ready");
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "menu" });
+
+  expect(await activate(page, "start-game")).toBe(true);
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
+  expect(await label(page, "hud-collectibles")).toBe("المقتنيات: 0");
+
+  await page.evaluate(() => window.__GAME_UI_HARNESS__?.forceCheckpoint());
+  await expect.poll(() => label(page, "hud-checkpoint")).toBe("تم حفظ التقدم");
+  expect(await label(page, "hud-collectibles")).toBe("المقتنيات: 0");
+});
+
+test("success paths surface the loading transition on start and both restarts", async ({ page }) => {
+  await page.goto("/?levelLoadDelayMs=400");
+  await expect(page.locator("[data-boot-status]")).toHaveAttribute("data-boot-status", "ready");
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "menu" });
+
+  expect(await activate(page, "start-game")).toBe(true);
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "loadingLevel" });
+  await expect.poll(() => label(page, "loading-title")).toBe("جارٍ تحميل المرحلة…");
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
+
+  expect(await activate(page, "hud-pause")).toBe(true);
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "paused" });
+  expect(await activate(page, "restart-level")).toBe(true);
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "loadingLevel" });
+  await expect.poll(() => label(page, "loading-title")).toBe("جارٍ تحميل المرحلة…");
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
+
+  await page.evaluate(() => window.__GAME_UI_HARNESS__?.forceGameOver());
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "gameOver" });
+  expect(await activate(page, "gameOver-restart")).toBe(true);
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "loadingLevel" });
+  await expect.poll(() => label(page, "loading-title")).toBe("جارٍ تحميل المرحلة…");
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
+});
+
 test("loading failure presents a localized recoverable error and retry", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

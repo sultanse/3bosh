@@ -67,5 +67,6 @@ interface Window {
     forceVictory(): void;
     forceGameOver(): void;
     forceDamage(): void;
+    forceCheckpoint(): void;
   };
 }

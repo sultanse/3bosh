@@ -17,6 +17,7 @@ export const ar: TranslationDictionary = {
   hudScore: "النقاط",
   hudCollectibles: "المقتنيات",
   hudHealth: "الصحة",
+  hudCheckpoint: "تم حفظ التقدم",
   tutorialMove: "استخدم أسهم الاتجاهات أو أزرار الحركة للتحرك عبر ورشة الغروب والوصول إلى البوابة بأمان.",
   tutorialJump: "اقفز",
   tutorialPause: "إيقاف مؤقت",

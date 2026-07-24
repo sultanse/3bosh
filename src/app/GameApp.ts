@@ -304,6 +304,7 @@ export class GameApp {
         level?.forceFall();
       },
       forceDamage: () => this.activeScene()?.level?.forceFall(),
+      forceCheckpoint: () => this.activeScene()?.level?.activateCheckpoint(),
     };
   }
 

@@ -19,6 +19,7 @@ export class Hud {
   private readonly healthText: TextBlock;
   private readonly scoreText: TextBlock;
   private readonly collectibleText: TextBlock;
+  private readonly checkpointText: TextBlock;
   private readonly shieldText: TextBlock;
   private readonly pauseButton: import("@babylonjs/gui/2D/controls/button").Button;
   private readonly damageFlash: Rectangle;
@@ -43,13 +44,16 @@ export class Hud {
     this.healthText = root.createText("hud-health", "", 21);
     this.scoreText = root.createText("hud-score", "", 21);
     this.collectibleText = root.createText("hud-collectibles", "", 21);
+    this.checkpointText = root.createText("hud-checkpoint", "", 19);
     this.shieldText = root.createText("hud-shield", "", 19);
-    for (const control of [this.healthText, this.scoreText, this.collectibleText, this.shieldText]) {
+    for (const control of [this.healthText, this.scoreText, this.collectibleText, this.checkpointText, this.shieldText]) {
       control.height = "32px";
       root.add(panel, control);
     }
     this.setHealth(localization, initial.health, initial.maxHealth);
     this.setScore(localization, initial.score, initial.collectibles);
+    this.checkpointText.text = "";
+    this.checkpointText.isVisible = false;
     this.shieldText.text = "";
     this.shieldText.isVisible = false;
     this.pauseButton = root.createButton("hud-pause", localization.t("pause"), pause);
@@ -77,8 +81,9 @@ export class Hud {
       this.shieldText.isVisible = active;
       this.shieldText.text = active ? "درع نشط" : "";
     }));
-    this.subscriptions.add(events.on("checkpointActivated", ({ checkpointId }) => {
-      this.collectibleText.text = `${localization.t("hudCollectibles")}: ${checkpointId}`;
+    this.subscriptions.add(events.on("checkpointActivated", () => {
+      this.checkpointText.text = localization.t("hudCheckpoint");
+      this.checkpointText.isVisible = true;
     }));
     this.subscriptions.add(events.on("playerDamaged", ({ direction }) => this.flashDamage(direction)));
   }
@@ -95,6 +100,7 @@ export class Hud {
     this.healthText.isVisible = false;
     this.scoreText.isVisible = false;
     this.collectibleText.isVisible = false;
+    this.checkpointText.isVisible = false;
     this.shieldText.isVisible = false;
     this.pauseButton.isVisible = false;
     this.damageFlash.isVisible = false;

@@ -15,6 +15,7 @@ export const STRINGS = {
   hudScore: "hudScore",
   hudCollectibles: "hudCollectibles",
   hudHealth: "hudHealth",
+  hudCheckpoint: "hudCheckpoint",
   tutorialMove: "tutorialMove",
   tutorialJump: "tutorialJump",
   tutorialPause: "tutorialPause",
