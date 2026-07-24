@@ -30,6 +30,15 @@ class MemoryStorage implements Storage {
   }
 }
 
+class ThrowingStorage implements Storage {
+  public get length(): number { return 0; }
+  public clear(): void {}
+  public getItem(_key: string): string | null { throw new Error("SecurityError"); }
+  public key(_index: number): string | null { return null; }
+  public removeItem(_key: string): void { throw new Error("SecurityError"); }
+  public setItem(_key: string, _value: string): void { throw new Error("SecurityError"); }
+}
+
 describe("SaveService", () => {
   it("falls back to defaults for malformed saved JSON", () => {
     const storage = new MemoryStorage();
@@ -88,5 +97,16 @@ describe("SaveService", () => {
     service.saveAudio({ musicVolume: Number.NaN, sfxVolume: Number.POSITIVE_INFINITY, muted: true });
 
     expect(service.load()).toMatchObject({ musicVolume: 0, sfxVolume: 0, muted: true });
+  });
+
+  it("returns safe defaults and does not throw when browser storage is unavailable", () => {
+    const service = new SaveService(new ThrowingStorage());
+
+    expect(service.load()).toEqual(DEFAULT_SAVE_DATA);
+    expect(() => {
+      service.saveAudio({ musicVolume: 0.4, sfxVolume: 0.8, muted: true });
+      service.saveHighScore(250);
+      service.clear();
+    }).not.toThrow();
   });
 });

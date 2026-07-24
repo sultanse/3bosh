@@ -58,7 +58,7 @@ export class LevelSession {
   }
 
   public collect(itemId: string, kind: CollectibleKind, scoreDelta: number): boolean {
-    if (this.collectedItemIds.has(itemId)) {
+    if (!Number.isFinite(scoreDelta) || !Number.isInteger(scoreDelta) || scoreDelta < 0 || this.collectedItemIds.has(itemId)) {
       return false;
     }
 

@@ -31,6 +31,13 @@ describe("GameFlowMachine", () => {
     expect(() => flow.transition("paused")).toThrow("Illegal game flow transition");
   });
 
+  it("does not allow callers to bypass the transition graph by assigning state", () => {
+    const flow = new GameFlowMachine("boot");
+
+    expect(Reflect.set(flow, "state", "victory")).toBe(false);
+    expect(flow.state).toBe("boot");
+  });
+
   it("finalizes a level score when the session reaches game over", () => {
     const flow = new GameFlowMachine("playing");
     const session = new GameSession(flow, new SaveService(new MemoryStorage()), new TypedEventBus<GameEvents>());
@@ -38,6 +45,18 @@ describe("GameFlowMachine", () => {
     level.addScore(180);
 
     session.transition("gameOver");
+
+    expect(session.saveData.highScore).toBe(180);
+  });
+
+  it("pins the victory result so later level events cannot change the saved score", () => {
+    const flow = new GameFlowMachine("playing");
+    const session = new GameSession(flow, new SaveService(new MemoryStorage()), new TypedEventBus<GameEvents>());
+    const level = session.startLevel({ id: "spawn", position: { x: 0, y: 0, z: 0 } });
+    level.addScore(180);
+
+    session.transition("victory");
+    level.addScore(500);
 
     expect(session.saveData.highScore).toBe(180);
   });

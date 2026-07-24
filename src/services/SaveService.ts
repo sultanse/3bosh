@@ -52,12 +52,12 @@ export class SaveService {
   public constructor(private readonly storage: Storage) {}
 
   public load(): SaveData {
-    const serialized = this.storage.getItem(SAVE_KEY);
-    if (serialized === null) {
-      return DEFAULT_SAVE_DATA;
-    }
-
     try {
+      const serialized = this.storage.getItem(SAVE_KEY);
+      if (serialized === null) {
+        return DEFAULT_SAVE_DATA;
+      }
+
       const parsed: unknown = JSON.parse(serialized);
       if (!isSaveData(parsed)) {
         return DEFAULT_SAVE_DATA;
@@ -93,10 +93,18 @@ export class SaveService {
   }
 
   public clear(): void {
-    this.storage.removeItem(SAVE_KEY);
+    try {
+      this.storage.removeItem(SAVE_KEY);
+    } catch {
+      // Storage can be disabled by browser privacy settings.
+    }
   }
 
   private persist(data: SaveData): void {
-    this.storage.setItem(SAVE_KEY, JSON.stringify(data));
+    try {
+      this.storage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch {
+      // Saving is best-effort when browser storage is unavailable.
+    }
   }
 }

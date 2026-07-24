@@ -71,6 +71,28 @@ describe("LevelSession", () => {
     expect(collected).toEqual([{ kind: "crystal", scoreDelta: 50 }]);
   });
 
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 1.5, -1])(
+    "rejects an invalid collectible score delta of %s without mutating or publishing",
+    (scoreDelta) => {
+      const events = new TypedEventBus<GameEvents>();
+      const collected: Array<{ kind: string; scoreDelta: number }> = [];
+      events.on("collectibleCollected", (event) => collected.push(event));
+      const level = new LevelSession(spawn, events);
+
+      expect(level.collect("invalid-crystal", "crystal", scoreDelta)).toBe(false);
+      expect(level.snapshot).toMatchObject({ score: 0, collectibles: 0 });
+      expect(level.snapshot.collectedItemIds.size).toBe(0);
+      expect(collected).toEqual([]);
+    },
+  );
+
+  it("allows a zero-score health collectible", () => {
+    const level = new LevelSession(spawn, new TypedEventBus<GameEvents>());
+
+    expect(level.collect("health-1", "health", 0)).toBe(true);
+    expect(level.snapshot).toMatchObject({ score: 0, collectibles: 1 });
+  });
+
   it("completes the goal only once and reports the final progress", () => {
     const events = new TypedEventBus<GameEvents>();
     const completed: Array<{ score: number; collectibles: number }> = [];

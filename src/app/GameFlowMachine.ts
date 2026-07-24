@@ -18,17 +18,21 @@ const transitions: Readonly<Record<GameFlowState, readonly GameFlowState[]>> = {
 };
 
 export class GameFlowMachine {
-  public state: GameFlowState;
+  private currentState: GameFlowState;
 
   public constructor(initialState: GameFlowState) {
-    this.state = initialState;
+    this.currentState = initialState;
+  }
+
+  public get state(): GameFlowState {
+    return this.currentState;
   }
 
   public transition(next: GameFlowState): void {
-    if (!transitions[this.state].includes(next)) {
-      throw new Error(`Illegal game flow transition: ${this.state} -> ${next}`);
+    if (!transitions[this.currentState].includes(next)) {
+      throw new Error(`Illegal game flow transition: ${this.currentState} -> ${next}`);
     }
 
-    this.state = next;
+    this.currentState = next;
   }
 }
