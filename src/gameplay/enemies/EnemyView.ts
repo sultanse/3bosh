@@ -1,8 +1,12 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
+import {
+  PhysicsMotionType,
+  PhysicsPrestepType,
+  PhysicsShapeType,
+} from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import type { PhysicsBody } from "@babylonjs/core/Physics/v2/physicsBody";
 import type { Scene } from "@babylonjs/core/scene";
@@ -32,13 +36,16 @@ export class EnemyView {
       { width: options.width, height: options.height, depth: options.depth },
       scene,
     );
+    this.root.position.copyFrom(options.position);
     this.aggregate = new PhysicsAggregate(
       this.root,
       PhysicsShapeType.BOX,
       { mass: 0, isTriggerShape: true },
       scene,
     );
-    this.root.position.copyFrom(options.position);
+    this.aggregate.body.setMotionType(PhysicsMotionType.ANIMATED);
+    this.aggregate.body.setPrestepType(PhysicsPrestepType.TELEPORT);
+    this.aggregate.body.setTargetTransform(options.position, Quaternion.Identity());
     const material = new StandardMaterial(`${options.id}-enemy-material`, scene);
     material.diffuseColor = colorFor(options.kind);
     material.specularColor = Color3.Black();
@@ -53,6 +60,7 @@ export class EnemyView {
 
   public setPosition(position: Readonly<Vector3>): void {
     this.root.position.copyFrom(position);
+    this.aggregate.body.setTargetTransform(this.root.position, Quaternion.Identity());
   }
 
   public setFacing(direction: -1 | 1): void {
@@ -74,6 +82,10 @@ export class EnemyView {
       feetY: this.root.position.y - halfHeight,
       topY: this.root.position.y + halfHeight,
     };
+  }
+
+  public get physicsPositionX(): number {
+    return this.aggregate.body.getBoundingBox().centerWorld.x;
   }
 
   public dispose(): void {

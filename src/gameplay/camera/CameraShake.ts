@@ -4,6 +4,7 @@ export class CameraShake {
   private amplitude = 0;
   private remainingSeconds = 0;
   private elapsedSeconds = 0;
+  private sampleCount = 0;
 
   public start(amplitude: number, durationSeconds: number): void {
     this.amplitude = Math.max(0, amplitude);
@@ -19,6 +20,12 @@ export class CameraShake {
     this.remainingSeconds = Math.max(0, this.remainingSeconds - stepSeconds);
     const decay = this.remainingSeconds === 0 ? 0 : this.remainingSeconds / (this.remainingSeconds + this.elapsedSeconds);
     const offset = this.amplitude * decay;
-    return new Vector3(Math.sin(this.elapsedSeconds * 71) * offset, Math.cos(this.elapsedSeconds * 53) * offset, 0);
+    const sample = new Vector3(Math.sin(this.elapsedSeconds * 71) * offset, Math.cos(this.elapsedSeconds * 53) * offset, 0);
+    if (sample.lengthSquared() > Number.EPSILON) this.sampleCount += 1;
+    return sample;
+  }
+
+  public get renderedSampleCount(): number {
+    return this.sampleCount;
   }
 }

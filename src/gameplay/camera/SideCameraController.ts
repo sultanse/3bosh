@@ -69,6 +69,10 @@ export class SideCameraController {
     this.shakeEffect.start(amplitude, durationSeconds);
   }
 
+  public get shakeSamples(): number {
+    return this.shakeEffect.renderedSampleCount;
+  }
+
   public resize(aspect: number, verticalSize: number): void {
     this.halfHeight = verticalSize / 2;
     this.halfWidth = this.halfHeight * aspect;

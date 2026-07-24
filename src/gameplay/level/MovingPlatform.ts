@@ -51,6 +51,10 @@ export class MovingPlatform {
     return { position: next, deltaX };
   }
 
+  public get root(): BuiltPlatform["root"] {
+    return this.platform.root;
+  }
+
   public dispose(): void {
     this.platform.dispose();
   }

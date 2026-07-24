@@ -112,6 +112,8 @@ export class LevelScene implements GameTestTarget {
   private jumpApexY = Number.NEGATIVE_INFINITY;
   private fixedStep180: { readonly x: number; readonly jumpApexY: number } | undefined;
   private scheduledJumpAtStep: number | undefined;
+  private projectilesFired = 0;
+  private stompBounceCount = 0;
   private playerFacing: -1 | 1 = 1;
   private queuedJumpKind: PlayerMotorCommand["jumpKind"] = null;
   private previousAspect = 0;
@@ -206,6 +208,13 @@ export class LevelScene implements GameTestTarget {
         score: this.levelSession.snapshot.score,
         defeatedEnemies: [...this.enemies.values()].filter((enemy) => enemy.defeated).length,
         activeProjectiles: this.projectilePool.activeCount,
+        projectilesFired: this.projectilesFired,
+        stompBounceCount: this.stompBounceCount,
+        verticalVelocity: motion?.velocity.y ?? 0,
+        cameraShakeSamples: this.camera.shakeSamples,
+        ...(this.enemyViews.has("patrol-a")
+          ? { patrolPhysicsX: this.enemyViews.get("patrol-a")?.physicsPositionX ?? 0 }
+          : {}),
         activeCheckpointId: this.levelSession.snapshot.activeCheckpointId,
         respawnProtected: this.elapsedSeconds < this.respawnProtectionUntil,
         flowState: this.flow.state,
@@ -237,6 +246,13 @@ export class LevelScene implements GameTestTarget {
   public defeatEnemy(): void {
     const enemy = this.enemies.get("patrol-a");
     if (enemy) this.resolveStomp(enemy);
+  }
+
+  public fireProjectileAt(x: number, y: number, velocityX: number): void {
+    this.spawnProjectile(
+      new Vector3(x, y, GAME_CONFIG.gameplayZ),
+      new Vector3(velocityX, 0, 0),
+    );
   }
 
   public collectItem(): void {}
@@ -347,6 +363,7 @@ export class LevelScene implements GameTestTarget {
       this.processEnemyContacts();
     }
     this.projectilePool.update(GAME_CONFIG.fixedStepSeconds, (position) => this.isProjectileWithinLevel(position));
+    this.processProjectileWorldContacts();
     this.processProjectileContacts(motion.position);
     this.jumpApexY = Math.max(this.jumpApexY, motion.position.y);
     if (this.fixedSteps === 180) {
@@ -439,6 +456,7 @@ export class LevelScene implements GameTestTarget {
     const projectile = this.projectilePool.acquire();
     if (!projectile) return;
     projectile.launch(origin.add(new Vector3(0, 0.2, 0)), velocity, GAME_CONFIG.enemies.projectileLifetimeSeconds);
+    this.projectilesFired += 1;
     this.events.emit("audioCueRequested", { cue: "projectile-fired" });
   }
 
@@ -464,6 +482,7 @@ export class LevelScene implements GameTestTarget {
     this.enemyViews.get(enemy.id)?.setDefeated();
     this.levelSession.addScore(enemy.score);
     this.controller.queueVerticalImpulse(GAME_CONFIG.enemies.stompBounceSpeed);
+    this.stompBounceCount += 1;
     this.events.emit("enemyDefeated", { enemyId: enemy.id, scoreDelta: enemy.score });
     this.events.emit("audioCueRequested", { cue: "enemy-defeated" });
     this.camera.shake(0.18, 0.15);
@@ -477,6 +496,31 @@ export class LevelScene implements GameTestTarget {
       projectile.deactivateWithGrace();
       this.applyContactDamage("projectile", dx < 0 ? GAME_CONFIG.enemies.sideKnockbackSpeed : -GAME_CONFIG.enemies.sideKnockbackSpeed);
     }
+  }
+
+  private processProjectileWorldContacts(): void {
+    for (const projectile of this.projectilePool.activeProjectiles) {
+      if (this.projectileHitsAuthoredPlatform(projectile.position)) projectile.deactivateWithGrace();
+    }
+  }
+
+  private projectileHitsAuthoredPlatform(position: Readonly<Vector3>): boolean {
+    return this.level.platforms.some((platform) => this.projectileOverlapsBounds(position, platform.root)) ||
+      this.level.movingPlatforms.some((platform) => this.projectileOverlapsBounds(position, platform.root));
+  }
+
+  private projectileOverlapsBounds(
+    position: Readonly<Vector3>,
+    collider: ReturnType<typeof MeshBuilder.CreateBox>,
+  ): boolean {
+    const radius = 0.17;
+    const bounds = collider.getBoundingInfo().boundingBox;
+    return position.x >= bounds.minimumWorld.x - radius &&
+      position.x <= bounds.maximumWorld.x + radius &&
+      position.y >= bounds.minimumWorld.y - radius &&
+      position.y <= bounds.maximumWorld.y + radius &&
+      position.z >= bounds.minimumWorld.z - radius &&
+      position.z <= bounds.maximumWorld.z + radius;
   }
 
   private isProjectileWithinLevel(position: Readonly<Vector3>): boolean {

@@ -14,6 +14,11 @@ export interface PlayerDiagnostic {
   readonly score?: number;
   readonly defeatedEnemies?: number;
   readonly activeProjectiles?: number;
+  readonly projectilesFired?: number;
+  readonly stompBounceCount?: number;
+  readonly verticalVelocity?: number;
+  readonly cameraShakeSamples?: number;
+  readonly patrolPhysicsX?: number;
   readonly activeCheckpointId?: string | null;
   readonly respawnProtected?: boolean;
   readonly flowState?: import("../app/GameFlowMachine").GameFlowState;
@@ -27,6 +32,7 @@ export interface GameTestTarget {
   forceFall(): void;
   activateCheckpoint(): void;
   defeatEnemy(): void;
+  fireProjectileAt(x: number, y: number, velocityX: number): void;
   collectItem(): void;
   reachGoal(): void;
   startFixedMovementScenario(): void;
@@ -90,6 +96,10 @@ export class GameTestHarness {
 
   public defeatEnemy(): void {
     this.target.defeatEnemy();
+  }
+
+  public fireProjectileAt(x: number, y: number, velocityX: number): void {
+    this.target.fireProjectileAt(x, y, velocityX);
   }
 
   public collectItem(): void {
