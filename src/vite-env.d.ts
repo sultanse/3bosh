@@ -32,6 +32,12 @@ interface GameDiagnostics {
     readonly verticalVelocity?: number;
     readonly cameraShakeSamples?: number;
     readonly patrolPhysicsX?: number;
+    readonly inactiveReservedProjectiles?: number;
+    readonly lastProjectileContactReason?: "world" | "player";
+    readonly lastProjectileContactAtSeconds?: number;
+    readonly lastProjectileReleasedAtSeconds?: number;
+    readonly projectileFireTimesSeconds?: readonly number[];
+    readonly lastProjectileDisabledAndReserved?: boolean;
     readonly activeCheckpointId?: string | null;
     readonly respawnProtected?: boolean;
     readonly flowState?: import("./app/GameFlowMachine").GameFlowState;

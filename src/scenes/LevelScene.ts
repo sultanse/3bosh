@@ -113,6 +113,11 @@ export class LevelScene implements GameTestTarget {
   private fixedStep180: { readonly x: number; readonly jumpApexY: number } | undefined;
   private scheduledJumpAtStep: number | undefined;
   private projectilesFired = 0;
+  private readonly projectileFireTimes: number[] = [];
+  private lastProjectileContactReason: "world" | "player" | undefined;
+  private lastProjectileContactAtSeconds: number | undefined;
+  private lastProjectileReleasedAtSeconds: number | undefined;
+  private lastProjectileDisabledAndReserved: boolean | undefined;
   private stompBounceCount = 0;
   private playerFacing: -1 | 1 = 1;
   private queuedJumpKind: PlayerMotorCommand["jumpKind"] = null;
@@ -208,12 +213,26 @@ export class LevelScene implements GameTestTarget {
         score: this.levelSession.snapshot.score,
         defeatedEnemies: [...this.enemies.values()].filter((enemy) => enemy.defeated).length,
         activeProjectiles: this.projectilePool.activeCount,
+        inactiveReservedProjectiles: this.projectilePool.inactiveReservedCount,
         projectilesFired: this.projectilesFired,
+        projectileFireTimesSeconds: [...this.projectileFireTimes],
         stompBounceCount: this.stompBounceCount,
         verticalVelocity: motion?.velocity.y ?? 0,
         cameraShakeSamples: this.camera.shakeSamples,
         ...(this.enemyViews.has("patrol-a")
           ? { patrolPhysicsX: this.enemyViews.get("patrol-a")?.physicsPositionX ?? 0 }
+          : {}),
+        ...(this.lastProjectileContactReason !== undefined
+          ? { lastProjectileContactReason: this.lastProjectileContactReason }
+          : {}),
+        ...(this.lastProjectileContactAtSeconds !== undefined
+          ? { lastProjectileContactAtSeconds: this.lastProjectileContactAtSeconds }
+          : {}),
+        ...(this.lastProjectileReleasedAtSeconds !== undefined
+          ? { lastProjectileReleasedAtSeconds: this.lastProjectileReleasedAtSeconds }
+          : {}),
+        ...(this.lastProjectileDisabledAndReserved !== undefined
+          ? { lastProjectileDisabledAndReserved: this.lastProjectileDisabledAndReserved }
           : {}),
         activeCheckpointId: this.levelSession.snapshot.activeCheckpointId,
         respawnProtected: this.elapsedSeconds < this.respawnProtectionUntil,
@@ -362,7 +381,11 @@ export class LevelScene implements GameTestTarget {
       this.contactAdapter.capturePlayerStep(this.previousStepMotion, motion);
       this.processEnemyContacts();
     }
+    const inactiveReservedBeforeUpdate = this.projectilePool.inactiveReservedCount;
     this.projectilePool.update(GAME_CONFIG.fixedStepSeconds, (position) => this.isProjectileWithinLevel(position));
+    if (inactiveReservedBeforeUpdate > 0 && this.projectilePool.inactiveReservedCount === 0) {
+      this.lastProjectileReleasedAtSeconds = this.elapsedSeconds;
+    }
     this.processProjectileWorldContacts();
     this.processProjectileContacts(motion.position);
     this.jumpApexY = Math.max(this.jumpApexY, motion.position.y);
@@ -457,6 +480,7 @@ export class LevelScene implements GameTestTarget {
     if (!projectile) return;
     projectile.launch(origin.add(new Vector3(0, 0.2, 0)), velocity, GAME_CONFIG.enemies.projectileLifetimeSeconds);
     this.projectilesFired += 1;
+    this.projectileFireTimes.push(this.elapsedSeconds);
     this.events.emit("audioCueRequested", { cue: "projectile-fired" });
   }
 
@@ -493,15 +517,27 @@ export class LevelScene implements GameTestTarget {
       const dx = projectile.position.x - playerPosition.x;
       const dy = projectile.position.y - playerPosition.y;
       if (Math.abs(dx) > GAME_CONFIG.player.radius + 0.17 || Math.abs(dy) > GAME_CONFIG.player.height / 2 + 0.17) continue;
-      projectile.deactivateWithGrace();
+      this.deactivateProjectile(projectile, "player");
       this.applyContactDamage("projectile", dx < 0 ? GAME_CONFIG.enemies.sideKnockbackSpeed : -GAME_CONFIG.enemies.sideKnockbackSpeed);
     }
   }
 
   private processProjectileWorldContacts(): void {
     for (const projectile of this.projectilePool.activeProjectiles) {
-      if (this.projectileHitsAuthoredPlatform(projectile.position)) projectile.deactivateWithGrace();
+      if (this.projectileHitsAuthoredPlatform(projectile.position)) this.deactivateProjectile(projectile, "world");
     }
+  }
+
+  private deactivateProjectile(
+    projectile: import("../gameplay/projectiles/Projectile").Projectile,
+    reason: "world" | "player",
+  ): void {
+    if (!projectile.active) return;
+    projectile.deactivateWithGrace();
+    this.lastProjectileContactReason = reason;
+    this.lastProjectileContactAtSeconds = this.elapsedSeconds;
+    this.lastProjectileReleasedAtSeconds = undefined;
+    this.lastProjectileDisabledAndReserved = projectile.reserved && !projectile.active;
   }
 
   private projectileHitsAuthoredPlatform(position: Readonly<Vector3>): boolean {

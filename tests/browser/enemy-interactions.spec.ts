@@ -32,15 +32,19 @@ test("shooter activates in range, damages the player, and its projectile is pool
   await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.activeProjectiles)).toBe(0);
 });
 
-test("a projectile hitting an authored platform begins its invisible pool grace", async ({ page }) => {
+test("a world-platform hit disables a projectile for exactly its pool grace before release", async ({ page }) => {
   await boot(page, 60);
-  await page.evaluate(() => (
-    window.__GAME_TEST_HARNESS__ as unknown as {
-      fireProjectileAt?: (x: number, y: number, velocityX: number) => void;
-    } | undefined
-  )?.fireProjectileAt?.(91.5, 1.2, 7));
-  await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.activeProjectiles)).toBe(1);
-  await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.activeProjectiles)).toBe(0);
+  await page.evaluate(() => window.__GAME_TEST_HARNESS__?.fireProjectileAt(91.5, 1.2, 7));
+  await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player)).toMatchObject({
+    lastProjectileContactReason: "world",
+    lastProjectileDisabledAndReserved: true,
+  });
+  const contact = await page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player);
+  expect(contact?.lastProjectileContactAtSeconds).toBeDefined();
+  await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.lastProjectileReleasedAtSeconds)).toBeDefined();
+  const released = await page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.lastProjectileReleasedAtSeconds);
+  expect((released ?? 0) - (contact?.lastProjectileContactAtSeconds ?? 0)).toBeGreaterThanOrEqual(0.19);
+  expect((released ?? Number.POSITIVE_INFINITY) - (contact?.lastProjectileContactAtSeconds ?? 0)).toBeLessThanOrEqual(0.23);
 });
 
 test("a stomp applies the real bounce and renders at least one camera-shake sample", async ({ page }) => {
@@ -54,16 +58,17 @@ test("a stomp applies the real bounce and renders at least one camera-shake samp
   await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.cameraShakeSamples ?? 0)).toBeGreaterThan(0);
 });
 
-test("a shooter stays dormant out of range and fires on its configured cadence in range", async ({ page }) => {
+test("a shooter stays dormant out of range and fires at its configured 1.1-second cadence in range", async ({ page }) => {
   await boot(page, 60);
   await page.waitForTimeout(350);
   expect(await page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.projectilesFired)).toBe(0);
 
   await page.evaluate(() => window.__GAME_TEST_HARNESS__?.teleportPlayer(75, 1));
-  await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.projectilesFired)).toBe(1);
-  await page.waitForTimeout(400);
-  expect(await page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.projectilesFired)).toBe(1);
   await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.projectilesFired)).toBe(2);
+  const shots = await page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.projectileFireTimesSeconds ?? []);
+  expect(shots).toHaveLength(2);
+  expect(shots[1]! - shots[0]!).toBeGreaterThanOrEqual(1.08);
+  expect(shots[1]! - shots[0]!).toBeLessThanOrEqual(1.13);
 });
 
 test("the patrol's animated Havok trigger body follows its fixed-step movement", async ({ page }) => {

@@ -38,6 +38,10 @@ export class ProjectilePool {
     return this.projectiles.filter((entry) => entry.active);
   }
 
+  public get inactiveReservedCount(): number {
+    return this.projectiles.filter((entry) => entry.reserved && !entry.active).length;
+  }
+
   public dispose(): void {
     for (const projectile of this.projectiles) projectile.dispose();
   }
