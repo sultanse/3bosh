@@ -73,6 +73,18 @@ describe("PlayerController", () => {
     expect(noInput.facing).toBe(1);
   });
 
+  it("preserves facing through non-running states and reports the accepted jump kind", () => {
+    const controller = createController();
+    const left = { ...EMPTY_INPUT, moveAxis: -1 as const };
+
+    expect(controller.update(STEP, left, GROUNDED_MOTION, 0).facing).toBe(-1);
+    const jumping = controller.update(STEP, JUMP_PRESSED, GROUNDED_MOTION, STEP);
+    expect(jumping.facing).toBe(-1);
+    expect(jumping.jumpKind).toBe("ground");
+    expect(controller.update(STEP, EMPTY_INPUT, AIRBORNE_MOTION, STEP * 2).facing).toBe(-1);
+    expect(controller.update(STEP, EMPTY_INPUT, GROUNDED_MOTION, STEP * 3).facing).toBe(-1);
+  });
+
   it("allows one air jump only when configured", () => {
     const disabled = createController(false);
     disabled.update(STEP, EMPTY_INPUT, GROUNDED_MOTION, 0);

@@ -17,7 +17,10 @@ import {
 } from "../dev/GameTestHarness";
 import { TypedEventBus, type GameEvents } from "../core/TypedEventBus";
 import { SideCameraController } from "../gameplay/camera/SideCameraController";
-import { PlayerController } from "../gameplay/player/PlayerController";
+import {
+  PlayerController,
+  type PlayerMotorCommand,
+} from "../gameplay/player/PlayerController";
 import { PlayerHealth } from "../gameplay/player/PlayerHealth";
 import { PlayerView } from "../gameplay/player/PlayerView";
 import type { InputSnapshot } from "../input/InputAction";
@@ -59,6 +62,8 @@ export class LevelScene implements GameTestTarget {
   private jumpApexY = Number.NEGATIVE_INFINITY;
   private fixedStep180: { readonly x: number; readonly jumpApexY: number } | undefined;
   private scheduledJumpAtStep: number | undefined;
+  private playerFacing: -1 | 1 = 1;
+  private queuedJumpKind: PlayerMotorCommand["jumpKind"] = null;
   private previousAspect = 0;
   private disposed = false;
 
@@ -223,9 +228,8 @@ export class LevelScene implements GameTestTarget {
       motion,
       this.elapsedSeconds,
     );
-    if (motor.acceptedJump) {
-      this.events.emit("playerJumped", { kind: "ground" });
-    }
+    this.playerFacing = motor.facing;
+    this.queuedJumpKind = motor.jumpKind;
     this.lastMotion = this.adapter.step({
       stepSeconds: GAME_CONFIG.fixedStepSeconds,
       velocityX: motor.velocityX,
@@ -235,6 +239,11 @@ export class LevelScene implements GameTestTarget {
   }
 
   private afterFixedStep(): void {
+    const jumpKind = this.queuedJumpKind;
+    this.queuedJumpKind = null;
+    if (jumpKind !== null) {
+      this.events.emit("playerJumped", { kind: jumpKind });
+    }
     this.lastMotion = this.adapter.readMotion(GAME_CONFIG.fixedStepSeconds);
     const motion = this.lastMotion;
     this.jumpApexY = Math.max(this.jumpApexY, motion.position.y);
@@ -242,7 +251,7 @@ export class LevelScene implements GameTestTarget {
       this.fixedStep180 = { x: motion.position.x, jumpApexY: this.jumpApexY };
     }
     this.playerView.setPosition(motion.position);
-    this.playerView.setFacing(this.controller.stateMachine.state === "running" && motion.velocity.x < 0 ? "left" : "right");
+    this.playerView.setFacing(this.playerFacing === -1 ? "left" : "right");
     this.playerView.setState(this.controller.stateMachine.state);
     this.playerView.update(GAME_CONFIG.fixedStepSeconds);
     const aspect = this.scene.getEngine().getRenderWidth() / Math.max(1, this.scene.getEngine().getRenderHeight());

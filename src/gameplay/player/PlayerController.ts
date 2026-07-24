@@ -18,6 +18,7 @@ export interface PlayerMotorCommand {
   readonly state: PlayerState;
   readonly facing: -1 | 1;
   readonly acceptedJump: boolean;
+  readonly jumpKind: "ground" | "coyote" | "double" | null;
 }
 
 const moveTowards = (current: number, target: number, maximumDelta: number): number => {
@@ -69,9 +70,10 @@ export class PlayerController {
     }
 
     let acceptedJump = false;
+    let jumpKind: "ground" | "coyote" | "double" | null = null;
     let overrideVelocityY = this.consumeQueuedVerticalImpulse();
     if (overrideVelocityY === null && !this.isConditionBlocking(nowSeconds) && this.hasBufferedJump(nowSeconds)) {
-      const jumpKind = this.consumeJump(grounded, nowSeconds);
+      jumpKind = this.consumeJump(grounded, nowSeconds);
       if (jumpKind !== null) {
         acceptedJump = true;
         overrideVelocityY = GAME_CONFIG.player.jumpSpeed;
@@ -97,6 +99,7 @@ export class PlayerController {
       state,
       facing: this.facingDirection,
       acceptedJump,
+      jumpKind,
     };
   }
 
