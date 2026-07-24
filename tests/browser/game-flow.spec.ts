@@ -5,6 +5,8 @@ const activate = (page: import("@playwright/test").Page, id: string) =>
   page.evaluate((controlId) => window.__GAME_UI_HARNESS__?.activate(controlId), id);
 const label = async (page: import("@playwright/test").Page, id: string): Promise<string | null | undefined> =>
   page.evaluate((controlId) => window.__GAME_UI_HARNESS__?.diagnostics().ui?.controls.find((control) => control.id === controlId)?.text, id);
+const isVisible = async (page: import("@playwright/test").Page, id: string): Promise<boolean | undefined> =>
+  page.evaluate((controlId) => window.__GAME_UI_HARNESS__?.diagnostics().ui?.controls.find((control) => control.id === controlId)?.visible, id);
 
 test("the Arabic game UI routes menu, pause, restart, victory and game-over actions", async ({ page }) => {
   await page.goto("/");
@@ -67,6 +69,30 @@ test("activating a checkpoint keeps the collectibles readout intact", async ({ p
   await page.evaluate(() => window.__GAME_UI_HARNESS__?.forceCheckpoint());
   await expect.poll(() => label(page, "hud-checkpoint")).toBe("تم حفظ التقدم");
   expect(await label(page, "hud-collectibles")).toBe("المقتنيات: 0");
+});
+
+test("hidden pause controls are neither reported visible nor invokable", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("[data-boot-status]")).toHaveAttribute("data-boot-status", "ready");
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "menu" });
+
+  expect(await activate(page, "start-game")).toBe(true);
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
+
+  const hiddenPauseControls = ["resume", "restart-level", "return-to-menu"];
+  for (const id of hiddenPauseControls) {
+    expect(await isVisible(page, id)).toBe(false);
+    expect(await activate(page, id)).toBe(false);
+  }
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
+
+  expect(await activate(page, "hud-pause")).toBe(true);
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "paused" });
+  for (const id of hiddenPauseControls) {
+    expect(await isVisible(page, id)).toBe(true);
+  }
+  expect(await activate(page, "resume")).toBe(true);
+  await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
 });
 
 test("success paths surface the loading transition on start and both restarts", async ({ page }) => {
