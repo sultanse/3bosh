@@ -38,6 +38,15 @@ describe("GameFlowMachine", () => {
     expect(flow.state).toBe("boot");
   });
 
+  it("allows loading another level after victory", () => {
+    const flow = new GameFlowMachine("playing");
+
+    flow.transition("victory");
+    flow.transition("loadingLevel");
+
+    expect(flow.state).toBe("loadingLevel");
+  });
+
   it("finalizes a level score when the session reaches game over", () => {
     const flow = new GameFlowMachine("playing");
     const session = new GameSession(flow, new SaveService(new MemoryStorage()), new TypedEventBus<GameEvents>());

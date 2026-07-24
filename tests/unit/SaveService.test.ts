@@ -91,13 +91,22 @@ describe("SaveService", () => {
     expect(service.load()).toEqual(DEFAULT_SAVE_DATA);
   });
 
-  it("normalizes non-finite audio volumes before persisting them", () => {
-    const service = new SaveService(new MemoryStorage());
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "normalizes non-finite audio volume %s before persisting it",
+    (volume) => {
+      const storage = new MemoryStorage();
+      const service = new SaveService(storage);
 
-    service.saveAudio({ musicVolume: Number.NaN, sfxVolume: Number.POSITIVE_INFINITY, muted: true });
+      service.saveAudio({ musicVolume: volume, sfxVolume: 0.5, muted: true });
 
-    expect(service.load()).toMatchObject({ musicVolume: 0, sfxVolume: 0, muted: true });
-  });
+      expect(JSON.parse(storage.getItem("3bosh.save") ?? "null")).toMatchObject({
+        musicVolume: 0,
+        sfxVolume: 0.5,
+        muted: true,
+      });
+      expect(service.load()).toMatchObject({ musicVolume: 0, sfxVolume: 0.5, muted: true });
+    },
+  );
 
   it("returns safe defaults and does not throw when browser storage is unavailable", () => {
     const service = new SaveService(new ThrowingStorage());

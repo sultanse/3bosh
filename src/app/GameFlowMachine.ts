@@ -13,7 +13,7 @@ const transitions: Readonly<Record<GameFlowState, readonly GameFlowState[]>> = {
   loadingLevel: ["playing", "menu"],
   playing: ["paused", "victory", "gameOver"],
   paused: ["playing", "menu"],
-  victory: ["menu"],
+  victory: ["loadingLevel", "menu"],
   gameOver: ["loadingLevel", "menu"],
 };
 
