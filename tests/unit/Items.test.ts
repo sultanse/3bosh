@@ -51,4 +51,19 @@ describe("collectible item effects", () => {
     pickup.dispose();
     scene.dispose();
   });
+
+  it("disposes unique pickup materials and its bounded collection pulse", () => {
+    const { scene, health, level } = createContext();
+    const pickup = new HealthPickup(scene, { id: "disposal-health", position: { x: 0, y: 1, z: 0 } });
+    health.damage(1, "fall", 0);
+
+    expect(scene.materials).toHaveLength(1);
+    expect(pickup.tryCollect(pickup.bounds, { level, health, nowSeconds: 4 })).toBe(true);
+    expect(scene.materials.some((material) => material.name === "collection-pulse-material-health-disposal-health")).toBe(true);
+    for (let index = 0; index < 30; index += 1) pickup.update(1 / 60);
+    expect(scene.materials.some((material) => material.name === "collection-pulse-material-health-disposal-health")).toBe(false);
+    pickup.dispose();
+    expect(scene.materials.some((material) => material.name === "health-material-disposal-health")).toBe(false);
+    scene.dispose();
+  });
 });

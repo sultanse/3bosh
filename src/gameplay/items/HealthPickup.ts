@@ -13,7 +13,7 @@ export class HealthPickup extends BaseCollectible {
     material.diffuseColor = new Color3(0.95, 0.2, 0.32);
     material.emissiveColor = new Color3(0.28, 0.025, 0.04);
     mesh.material = material;
-    super(placement.id, mesh);
+    super(placement.id, mesh, material);
   }
 
   protected collect(context: CollectionContext): boolean {

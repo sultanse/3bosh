@@ -17,7 +17,7 @@ export class ShieldPowerUp extends BaseCollectible {
     material.diffuseColor = new Color3(0.15, 0.7, 0.95);
     material.emissiveColor = new Color3(0.02, 0.15, 0.28);
     mesh.material = material;
-    super(placement.id, mesh);
+    super(placement.id, mesh, material);
   }
 
   protected collect(context: CollectionContext): boolean {
