@@ -7,6 +7,7 @@ import {
   PhysicsMotionType,
   PhysicsPrestepType,
   PhysicsShapeType,
+  type IBasePhysicsCollisionEvent,
 } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import type { Observer } from "@babylonjs/core/Misc/observable";
@@ -67,6 +68,7 @@ export class PhysicsProbeScene {
   private beforeStepObserver: Observer<Scene> | undefined;
   private afterStepObserver: Observer<Scene> | undefined;
   private sceneDisposeObserver: Observer<Scene> | undefined;
+  private triggerObserver: Observer<IBasePhysicsCollisionEvent> | undefined;
 
   private constructor(
     private readonly scene: Scene,
@@ -134,6 +136,9 @@ export class PhysicsProbeScene {
     if (this.sceneDisposeObserver) {
       this.scene.onDisposeObservable.remove(this.sceneDisposeObserver);
     }
+    if (this.triggerObserver) {
+      this.world.plugin.onTriggerCollisionObservable.remove(this.triggerObserver);
+    }
     this.adapter.dispose();
   }
 
@@ -186,7 +191,7 @@ export class PhysicsProbeScene {
     camera.orthoRight = 11;
     new HemisphericLight("probe-light", Vector3.Up(), this.scene);
 
-    this.world.plugin.onTriggerCollisionObservable.add((event) => {
+    this.triggerObserver = this.world.plugin.onTriggerCollisionObservable.add((event) => {
       const touchesProbeTrigger =
         event.collider === this.trigger.body ||
         event.collidedAgainst === this.trigger.body;
