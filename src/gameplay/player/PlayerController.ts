@@ -126,6 +126,9 @@ export class PlayerController {
   }
 
   public revive(): void {
+    if (this.dead) {
+      return;
+    }
     this.dead = false;
     this.hurtUntilSeconds = null;
     this.resetMotion();

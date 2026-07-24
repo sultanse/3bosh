@@ -30,7 +30,7 @@ export class PlayerStateMachine {
   }
 
   public set(state: PlayerState): void {
-    if (state === this.currentState) {
+    if (state === this.currentState || this.currentState === "dead") {
       return;
     }
     this.currentState = state;

@@ -90,11 +90,53 @@ describe("InputManager", () => {
     });
   });
 
+  it("clears default touch pointers when the browser window loses focus", () => {
+    const windowTarget = new FakeWindow();
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: windowTarget,
+    });
+
+    try {
+      const touch = new TouchInputSource();
+      const manager = new InputManager([touch]);
+      windowTarget.dispatchPointer("pointerdown", 3, touch.jumpElement);
+      windowTarget.dispatchEvent(new Event("blur"));
+
+      expect(manager.sample()).toMatchObject({ jumpHeld: false, jumpPressed: false });
+    } finally {
+      if (originalWindow === undefined) {
+        Reflect.deleteProperty(globalThis, "window");
+      } else {
+        Object.defineProperty(globalThis, "window", originalWindow);
+      }
+    }
+  });
+
+  it("emits rapid release-and-repress edges on consecutive samples", () => {
+    const windowTarget = new FakeWindow();
+    const keyboard = new KeyboardInputSource(windowTarget);
+    const manager = new InputManager([keyboard]);
+
+    windowTarget.dispatchKey("keydown", "Space");
+    expect(manager.sample().jumpPressed).toBe(true);
+    windowTarget.dispatchKey("keyup", "Space");
+    windowTarget.dispatchKey("keydown", "Space");
+    expect(manager.sample().jumpPressed).toBe(true);
+
+    windowTarget.dispatchKey("keydown", "Escape");
+    expect(manager.sample().pausePressed).toBe(true);
+    windowTarget.dispatchKey("keyup", "Escape");
+    windowTarget.dispatchKey("keydown", "Escape");
+    expect(manager.sample().pausePressed).toBe(true);
+  });
+
   it("merges sources without mutating their snapshots", () => {
     const source = new SnapshotSource({ moveAxis: -1, jumpPressed: true, jumpHeld: true, pausePressed: false, restartPressed: false });
     const manager = new InputManager([source]);
 
     expect(manager.sample()).toMatchObject({ moveAxis: -1, jumpPressed: true, jumpHeld: true });
-    expect(manager.sample()).toMatchObject({ moveAxis: -1, jumpPressed: false, jumpHeld: true });
+    expect(manager.sample()).toMatchObject({ moveAxis: -1, jumpPressed: true, jumpHeld: true });
   });
 });

@@ -33,5 +33,7 @@ describe("PlayerStateMachine", () => {
     expect(machine.resolve("running")).toBe("hurt");
     machine.set("dead");
     expect(machine.resolve("idle")).toBe("dead");
+    machine.set("running");
+    expect(machine.state).toBe("dead");
   });
 });

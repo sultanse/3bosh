@@ -12,7 +12,6 @@ export interface InputSource {
 
 export class InputManager {
   private readonly sources: InputSource[];
-  private readonly previousEdges = new WeakMap<InputSource, Pick<InputSnapshot, "jumpPressed" | "pausePressed" | "restartPressed">>();
 
   public constructor(sources: readonly InputSource[] = []) {
     this.sources = [...sources];
@@ -32,11 +31,6 @@ export class InputManager {
 
     for (const source of this.sources) {
       const snapshot = source.sample();
-      const previous = this.previousEdges.get(source) ?? {
-        jumpPressed: false,
-        pausePressed: false,
-        restartPressed: false,
-      };
       if (snapshot.moveAxis !== 0) {
         const activation = source.getLastMoveActivation?.() ?? 0;
         if (activation >= latestMoveActivation) {
@@ -44,15 +38,10 @@ export class InputManager {
           latestMoveActivation = activation;
         }
       }
-      jumpPressed ||= snapshot.jumpPressed && !previous.jumpPressed;
+      jumpPressed ||= snapshot.jumpPressed;
       jumpHeld ||= snapshot.jumpHeld;
-      pausePressed ||= snapshot.pausePressed && !previous.pausePressed;
-      restartPressed ||= snapshot.restartPressed && !previous.restartPressed;
-      this.previousEdges.set(source, {
-        jumpPressed: snapshot.jumpPressed,
-        pausePressed: snapshot.pausePressed,
-        restartPressed: snapshot.restartPressed,
-      });
+      pausePressed ||= snapshot.pausePressed;
+      restartPressed ||= snapshot.restartPressed;
     }
 
     return { moveAxis, jumpPressed, jumpHeld, pausePressed, restartPressed };

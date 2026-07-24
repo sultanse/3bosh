@@ -93,7 +93,7 @@ describe("PlayerController", () => {
     expect(controller.update(STEP, EMPTY_INPUT, AIRBORNE_MOTION, STEP).overrideVelocityY).toBeNull();
   });
 
-  it("holds hurt until expiry, makes death terminal, and revives for respawn", () => {
+  it("holds hurt until expiry, makes death terminal, and only resets non-terminal respawns", () => {
     const controller = createController();
     controller.enterHurt(1);
     expect(controller.update(STEP, RIGHT_HELD, GROUNDED_MOTION, 0).state).toBe("hurt");
@@ -102,7 +102,12 @@ describe("PlayerController", () => {
     controller.markDead();
     expect(controller.update(STEP, RIGHT_HELD, GROUNDED_MOTION, 2).state).toBe("dead");
     controller.revive();
-    expect(controller.update(STEP, EMPTY_INPUT, GROUNDED_MOTION, 3).state).toBe("idle");
+    expect(controller.update(STEP, EMPTY_INPUT, GROUNDED_MOTION, 3).state).toBe("dead");
+
+    const respawningController = createController();
+    respawningController.enterHurt(10);
+    respawningController.revive();
+    expect(respawningController.update(STEP, EMPTY_INPUT, GROUNDED_MOTION, 3).state).toBe("idle");
   });
 
   it("resets all controller-owned motion", () => {

@@ -7,6 +7,9 @@ import type { InputSource } from "./InputManager";
 
 type TouchAction = InputAction;
 
+const defaultBlurTarget = (): EventTarget | undefined =>
+  typeof window === "undefined" ? undefined : window;
+
 /**
  * Input source for touch controls. Consumers can replace the exposed targets
  * with their GUI buttons through bind(); no browser globals are required.
@@ -46,7 +49,7 @@ export class TouchInputSource implements InputSource {
 
   private readonly blurListener = (): void => this.clear();
 
-  public constructor(private readonly blurTarget?: EventTarget) {
+  public constructor(private readonly blurTarget: EventTarget | undefined = defaultBlurTarget()) {
     this.bind("left", this.leftElement);
     this.bind("right", this.rightElement);
     this.bind("jump", this.jumpElement);
