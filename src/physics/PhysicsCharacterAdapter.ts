@@ -26,6 +26,8 @@ export interface CharacterStepCommand {
   readonly stepSeconds: number;
   readonly velocityX: number;
   readonly overrideVelocityY: number | null;
+  /** Character controller gravity is opt-in so established probe callers retain their behavior. */
+  readonly applyGravity?: boolean;
 }
 
 export interface CharacterStepResult extends CharacterMotionSnapshot {}
@@ -86,15 +88,17 @@ export class PhysicsCharacterAdapter {
     const support = this.controller.checkSupport(command.stepSeconds, Vector3.Down());
     this.lastSupport = toCharacterSupport(support);
     const currentVelocity = this.controller.getVelocity();
-    const velocityY =
-      command.overrideVelocityY === null
-        ? currentVelocity.y
-        : command.overrideVelocityY;
+    const requestedVelocityY = command.overrideVelocityY ?? (command.applyGravity
+      ? currentVelocity.y + GAME_CONFIG.gravity * command.stepSeconds
+      : currentVelocity.y);
+    const velocityY = support.supportedState === CharacterSupportedState.SUPPORTED && requestedVelocityY < 0
+      ? 0
+      : requestedVelocityY;
     this.controller.setVelocity(new Vector3(command.velocityX, velocityY, 0));
     this.controller.integrate(
       command.stepSeconds,
       support,
-      new Vector3(0, GAME_CONFIG.gravity, 0),
+      command.applyGravity ? Vector3.Zero() : new Vector3(0, GAME_CONFIG.gravity, 0),
     );
 
     const position = this.controller.getPosition();

@@ -6,7 +6,9 @@ import { Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scene } from "@babylonjs/core/scene";
 import { DeterministicTestEngine } from "../dev/DeterministicTestEngine";
+import { GameTestHarness } from "../dev/GameTestHarness";
 import { BootScene } from "../scenes/BootScene";
+import { LevelScene } from "../scenes/LevelScene";
 import { PhysicsProbeScene } from "../scenes/PhysicsProbeScene";
 
 export interface GameAppOptions {
@@ -36,11 +38,16 @@ export class GameApp {
       return;
     }
 
-    const probe = new URLSearchParams(window.location.search).get("probe");
-    const renderFps = Number(new URLSearchParams(window.location.search).get("renderFps"));
+    const query = new URLSearchParams(window.location.search);
+    const probe = query.get("probe");
+    const level = query.get("level");
+    const renderFps = Number(query.get("renderFps"));
     const isPhysicsProbe = probe === "physics";
+    const isTestLevel = level === "test";
+    const testBuild = import.meta.env.MODE === "test";
+    const attachHarness = (import.meta.env.DEV || testBuild) && isTestLevel;
     const engine =
-      isPhysicsProbe && import.meta.env.MODE === "test" && Number.isFinite(renderFps) && renderFps > 0
+      (isPhysicsProbe || isTestLevel) && testBuild && Number.isFinite(renderFps) && renderFps > 0
         ? new DeterministicTestEngine(this.canvas, renderFps, engineOptions)
         : new Engine(this.canvas, true, engineOptions);
     const scene = new Scene(engine);
@@ -53,6 +60,17 @@ export class GameApp {
     try {
       if (isPhysicsProbe) {
         await PhysicsProbeScene.create(scene);
+      } else if (isTestLevel) {
+        const levelScene = await LevelScene.create(scene, { testMode: attachHarness });
+        if (attachHarness) {
+          const harness = new GameTestHarness(levelScene);
+          window.__GAME_TEST_HARNESS__ = harness;
+          scene.onAfterStepObservable.add(() => harness.publish());
+          scene.onDisposeObservable.add(() => {
+            delete window.__GAME_TEST_HARNESS__;
+            delete window.__GAME_DIAGNOSTICS__;
+          });
+        }
       } else {
         new FreeCamera("camera", Vector3.Zero(), scene);
       }

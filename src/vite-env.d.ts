@@ -14,8 +14,30 @@ interface PhysicsProbeDiagnostics {
 
 interface GameDiagnostics {
   readonly physicsProbe?: PhysicsProbeDiagnostics;
+  readonly player?: {
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+    readonly grounded: boolean;
+    readonly airJumpCount: number;
+    readonly fixedSteps: number;
+    readonly jumpApexY: number;
+    readonly fixedStep180?: { readonly x: number; readonly jumpApexY: number };
+  };
+}
+
+interface GameTestHarness {
+  setInput(input: Partial<import("./input/InputAction").InputSnapshot>): void;
+  teleportPlayer(x: number, y: number): void;
+  forceFall(): void;
+  activateCheckpoint(): void;
+  defeatEnemy(): void;
+  collectItem(): void;
+  reachGoal(): void;
+  startFixedMovementScenario(): void;
 }
 
 interface Window {
   __GAME_DIAGNOSTICS__?: GameDiagnostics;
+  __GAME_TEST_HARNESS__?: GameTestHarness;
 }

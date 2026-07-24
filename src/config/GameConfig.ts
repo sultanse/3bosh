@@ -12,7 +12,7 @@ export const GAME_CONFIG = {
     groundAcceleration: 38,
     groundDeceleration: 44,
     airAcceleration: 18,
-    jumpSpeed: 10.5,
+    jumpSpeed: 7.5,
     coyoteSeconds: 0.1,
     jumpBufferSeconds: 0.12,
     doubleJumpEnabled: false,

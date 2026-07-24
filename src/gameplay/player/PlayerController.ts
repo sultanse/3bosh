@@ -108,6 +108,10 @@ export class PlayerController {
     this.queuedVerticalImpulse = null;
   }
 
+  public get airJumpCount(): number {
+    return this.usedAirJumps;
+  }
+
   public queueVerticalImpulse(value: number): void {
     this.queuedVerticalImpulse = value;
   }
