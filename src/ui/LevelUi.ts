@@ -11,6 +11,7 @@ import { DisposableBag } from "../core/DisposableBag";
 
 export interface LevelUiCallbacks {
   readonly resume: () => void;
+  readonly pause: () => void;
   readonly restart: () => void;
   readonly menu: () => void;
 }
@@ -32,7 +33,7 @@ export class LevelUi {
     private readonly callbacks: LevelUiCallbacks,
   ) {
     this.root = new UiRoot(scene, localization);
-    this.hud = new Hud(this.root, events, localization, initial);
+    this.hud = new Hud(this.root, events, localization, initial, callbacks.pause);
     this.pause = new PauseMenu(this.root, callbacks);
     this.tutorial = new TutorialOverlay(this.root);
     this.subscriptions.add(events.on("tutorialRequested", ({ messageKey, durationSeconds }) => {
@@ -42,6 +43,7 @@ export class LevelUi {
 
   public sync(state: GameFlowState): void {
     if (state === "playing") this.tutorial.update(1 / 60);
+    this.hud.update(1 / 60);
     this.pause.setVisible(state === "paused");
     const outcome = state === "victory" || state === "gameOver" ? state : undefined;
     if (outcome === undefined || outcome === this.outcome) return;

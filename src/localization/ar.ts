@@ -10,6 +10,7 @@ export const ar: TranslationDictionary = {
   gameOverMessage: "انتهت المحاولة",
   clearSavedData: "مسح البيانات المحفوظة",
   pause: "إيقاف مؤقت",
+  loadingLevel: "جارٍ تحميل المرحلة…",
   menuPlay: "ابدأ اللعب",
   menuSettings: "الإعدادات",
   menuQuit: "خروج",

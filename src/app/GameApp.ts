@@ -14,6 +14,7 @@ import { LocalizationService } from "../services/LocalizationService";
 import { BootScene } from "../scenes/BootScene";
 import { LevelScene } from "../scenes/LevelScene";
 import { MenuScene } from "../scenes/MenuScene";
+import { LoadingScene } from "../scenes/LoadingScene";
 import { PhysicsProbeScene } from "../scenes/PhysicsProbeScene";
 import { GameFlowMachine, type GameFlowState } from "./GameFlowMachine";
 import { SceneRouter, type ManagedScene } from "./SceneRouter";
@@ -46,6 +47,9 @@ export class GameApp {
   private engine: AbstractEngine | undefined;
   private scene: Scene | undefined;
   private router: SceneRouter | undefined;
+  private loadError: Error | undefined;
+  private failNextLevelLoad = false;
+  private levelLoadDelayMs = 0;
 
   public constructor(options: GameAppOptions) {
     this.canvas = options.canvas;
@@ -60,6 +64,8 @@ export class GameApp {
     const renderFps = Number(query.get("renderFps"));
     const isPhysicsProbe = probe === "physics";
     const isTestLevel = level === "test";
+    this.failNextLevelLoad = query.get("failLevelLoad") === "1";
+    this.levelLoadDelayMs = Math.max(0, Number(query.get("levelLoadDelayMs")) || 0);
     const testBuild = import.meta.env.MODE === "test";
     const engine =
       (isPhysicsProbe || isTestLevel) && testBuild && Number.isFinite(renderFps) && renderFps > 0
@@ -132,6 +138,9 @@ export class GameApp {
       level: {
         create: async (signal) => this.createLevelScene(engine, signal),
       },
+      loading: {
+        create: async (signal) => this.createLoadingScene(engine, signal),
+      },
     });
     this.flow.transition("menu");
     await this.router.goTo("menu");
@@ -143,6 +152,14 @@ export class GameApp {
 
   private async createLevelScene(engine: AbstractEngine, signal: AbortSignal): Promise<RenderableScene> {
     if (signal.aborted) throw new DOMException("Navigation aborted", "AbortError");
+    if (this.levelLoadDelayMs > 0) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, this.levelLoadDelayMs));
+      if (signal.aborted) throw new DOMException("Navigation aborted", "AbortError");
+    }
+    if (this.failNextLevelLoad) {
+      this.failNextLevelLoad = false;
+      throw new Error("Simulated level load failure");
+    }
     const scene = new Scene(engine);
     scene.clearColor = new Color4(0.06, 0.12, 0.22, 1);
     let level: LevelScene | undefined;
@@ -153,10 +170,11 @@ export class GameApp {
       if (signal.aborted) throw new DOMException("Navigation aborted", "AbortError");
       ui = new LevelUi(scene, this.localization, level.gameEvents, level.hudSnapshot, {
         resume: () => this.resumeLevel(),
-        restart: () => { void this.startLevel(); },
+        pause: () => this.pauseLevel(),
+        restart: () => this.requestStartLevel(),
         menu: () => { void this.showMenu(); },
       });
-      restartSubscription = level.onEvent("restartRequested", () => { void this.startLevel(); });
+      restartSubscription = level.onEvent("restartRequested", () => this.requestStartLevel());
       const boundLevel = level;
       const boundUi = ui;
       return {
@@ -186,11 +204,13 @@ export class GameApp {
   }
 
   private async createMenuScene(engine: AbstractEngine, signal: AbortSignal): Promise<RenderableScene> {
-    const menu = await MenuScene.create(engine, {
+    const menuOptions = {
       localization: this.localization,
-      start: () => { void this.startLevel(); },
+      start: () => this.requestStartLevel(),
       clearSavedData: () => this.saves.clear(),
-    }, signal);
+      ...(this.loadError ? { retry: () => this.requestStartLevel() } : {}),
+    };
+    const menu = await MenuScene.create(engine, menuOptions, signal);
     return {
       name: menu.name,
       get uiSnapshot() { return menu.ui.snapshot(); },
@@ -202,11 +222,29 @@ export class GameApp {
 
   private async startLevel(): Promise<void> {
     if (!this.router) return;
+    if (this.flow.state === "loadingLevel") return;
+    this.loadError = undefined;
     if (this.flow.state === "menu" || this.flow.state === "victory" || this.flow.state === "gameOver" || this.flow.state === "playing" || this.flow.state === "paused") {
       this.flow.transition("loadingLevel");
     }
+    await this.router.goTo("loading");
     await this.router.goTo("level");
-    if (this.flow.state === "loadingLevel") this.flow.transition("playing");
+    this.flow.transition("playing");
+  }
+
+  private requestStartLevel(): void {
+    void this.startLevel().catch((reason: unknown) => {
+      if (reason instanceof DOMException && reason.name === "AbortError") return;
+      const error = reason instanceof Error ? reason : new Error(String(reason));
+      void this.showLoadError(error);
+    });
+  }
+
+  private async showLoadError(error: Error): Promise<void> {
+    if (!this.router || this.flow.state !== "loadingLevel") return;
+    this.loadError = error;
+    this.flow.transition("menu");
+    await this.router.goTo("menu");
   }
 
   private async showMenu(): Promise<void> {
@@ -220,6 +258,12 @@ export class GameApp {
     const level = this.activeScene()?.level;
     level?.resume();
     if (this.flow.state === "paused") this.flow.transition("playing");
+  }
+
+  private pauseLevel(): void {
+    const level = this.activeScene()?.level;
+    level?.pause();
+    if (this.flow.state === "playing") this.flow.transition("paused");
   }
 
   private syncFlow(level: LevelScene): void {
@@ -259,6 +303,17 @@ export class GameApp {
         level?.forceFall();
         level?.forceFall();
       },
+      forceDamage: () => this.activeScene()?.level?.forceFall(),
+    };
+  }
+
+  private async createLoadingScene(engine: AbstractEngine, signal: AbortSignal): Promise<RenderableScene> {
+    const loading = await LoadingScene.create(engine, this.localization, signal);
+    return {
+      name: loading.name,
+      get uiSnapshot() { return loading.ui.snapshot(); },
+      render: () => loading.render(),
+      dispose: () => loading.dispose(),
     };
   }
 

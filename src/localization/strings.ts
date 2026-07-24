@@ -8,6 +8,7 @@ export const STRINGS = {
   gameOverMessage: "gameOverMessage",
   clearSavedData: "clearSavedData",
   pause: "pause",
+  loadingLevel: "loadingLevel",
   menuPlay: "menuPlay",
   menuSettings: "menuSettings",
   menuQuit: "menuQuit",

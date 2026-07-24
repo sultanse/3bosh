@@ -1,4 +1,4 @@
-export type SceneRoute = "menu" | "level";
+export type SceneRoute = "menu" | "loading" | "level";
 
 export interface ManagedScene {
   readonly name: string;

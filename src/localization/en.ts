@@ -10,6 +10,7 @@ export const en: TranslationDictionary = {
   gameOverMessage: "Attempt over",
   clearSavedData: "Clear Saved Data",
   pause: "Pause",
+  loadingLevel: "Loading level…",
   menuPlay: "Play",
   menuSettings: "Settings",
   menuQuit: "Quit",

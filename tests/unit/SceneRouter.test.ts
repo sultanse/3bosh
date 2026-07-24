@@ -25,6 +25,7 @@ describe("SceneRouter", () => {
     let levelSignal: AbortSignal | undefined;
     const router = new SceneRouter({
       menu: { create: vi.fn(async () => menu) },
+      loading: { create: vi.fn(async () => managed("loading")) },
       level: {
         create: vi.fn((signal) => {
           levelSignal = signal;
@@ -47,8 +48,9 @@ describe("SceneRouter", () => {
   it("disposes the previous scene exactly once after its replacement is ready", async () => {
     const first = managed("first");
     const second = managed("second");
-    const factories: Readonly<Record<"menu" | "level", SceneFactory>> = {
+    const factories: Readonly<Record<"menu" | "loading" | "level", SceneFactory>> = {
       menu: { create: vi.fn(async () => first) },
+      loading: { create: vi.fn(async () => managed("loading")) },
       level: { create: vi.fn(async () => second) },
     };
     const router = new SceneRouter(factories);
@@ -65,6 +67,7 @@ describe("SceneRouter", () => {
     const menu = managed("menu");
     const router = new SceneRouter({
       menu: { create: vi.fn(async () => menu) },
+      loading: { create: vi.fn(async () => managed("loading")) },
       level: { create: vi.fn(async () => { throw new Error("Havok unavailable"); }) },
     });
     await router.goTo("menu");

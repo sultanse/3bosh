@@ -6,12 +6,14 @@ import { Scene } from "@babylonjs/core/scene";
 import type { ManagedScene } from "../app/SceneRouter";
 import type { LocalizationService } from "../services/LocalizationService";
 import { MainMenu } from "../ui/MainMenu";
+import { ErrorScreen } from "../ui/ErrorScreen";
 import { UiRoot } from "../ui/UiRoot";
 
 export interface MenuSceneOptions {
   readonly localization: LocalizationService;
   readonly start: () => void;
   readonly clearSavedData: () => void;
+  readonly retry?: () => void;
 }
 
 export class MenuScene implements ManagedScene {
@@ -29,6 +31,7 @@ export class MenuScene implements ManagedScene {
       start: options.start,
       clearSavedData: options.clearSavedData,
     });
+    if (options.retry !== undefined) new ErrorScreen(this.ui, options.retry);
   }
 
   public static async create(engine: AbstractEngine, options: MenuSceneOptions, signal: AbortSignal): Promise<MenuScene> {

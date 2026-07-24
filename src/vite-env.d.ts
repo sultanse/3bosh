@@ -66,5 +66,6 @@ interface Window {
     activate(id: string): boolean;
     forceVictory(): void;
     forceGameOver(): void;
+    forceDamage(): void;
   };
 }

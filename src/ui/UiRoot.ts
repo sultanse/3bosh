@@ -94,6 +94,10 @@ export class UiRoot {
     parent.addControl(control);
   }
 
+  public track(id: string, control: DiagnosticControl, text: () => string | null = () => null): void {
+    this.register(id, control, text);
+  }
+
   public snapshot(): UiDiagnosticsSnapshot {
     const engine = this.texture.getScene()?.getEngine();
     const viewport = {

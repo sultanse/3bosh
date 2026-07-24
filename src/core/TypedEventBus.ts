@@ -6,6 +6,7 @@ export interface GameEvents {
     readonly health: number;
     readonly amount: number;
     readonly source: "enemy" | "projectile" | "fall";
+    readonly direction: "left" | "right" | "center";
   };
   readonly healthChanged: { readonly health: number; readonly maxHealth: number };
   readonly shieldChanged: { readonly active: boolean; readonly expiresAtSeconds: number | null };

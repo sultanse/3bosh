@@ -116,6 +116,7 @@ export class LevelScene implements GameTestTarget {
   private projectilesFired = 0;
   private readonly projectileFireTimes: number[] = [];
   private readonly seenTutorialIds = new Set<string>();
+  private pendingDamageDirection: "left" | "right" | "center" = "center";
   private lastProjectileContactReason: "world" | "player" | undefined;
   private lastProjectileContactAtSeconds: number | undefined;
   private lastProjectileReleasedAtSeconds: number | undefined;
@@ -164,7 +165,12 @@ export class LevelScene implements GameTestTarget {
         events: {
           healthChanged: (health, maxHealth) => this.events.emit("healthChanged", { health, maxHealth }),
           shieldChanged: (active, expiresAtSeconds) => this.events.emit("shieldChanged", { active, expiresAtSeconds }),
-          damaged: (amount, source, health) => this.events.emit("playerDamaged", { amount, source, health }),
+          damaged: (amount, source, health) => this.events.emit("playerDamaged", {
+            amount,
+            source,
+            health,
+            direction: this.pendingDamageDirection,
+          }),
           died: () => this.events.emit("playerDied", undefined),
         },
       },
@@ -620,6 +626,7 @@ export class LevelScene implements GameTestTarget {
   }
 
   private applyContactDamage(source: "enemy" | "projectile", horizontalKnockback: number): void {
+    this.pendingDamageDirection = horizontalKnockback > 0 ? "left" : "right";
     const outcome = this.health.damage(1, source, this.elapsedSeconds);
     if (!outcome.applied) return;
     this.playerView.flashDamage(0.2);
@@ -690,6 +697,7 @@ export class LevelScene implements GameTestTarget {
 
   private handleDamage(source: "fall"): void {
     if (this.flow.state !== "playing") return;
+    this.pendingDamageDirection = "center";
     const outcome = this.health.damage(1, source, this.elapsedSeconds);
     if (!outcome.applied) return;
     this.playerView.flashDamage(0.2);
