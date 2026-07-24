@@ -1,6 +1,7 @@
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { Button } from "@babylonjs/gui/2D/controls/button";
 import { Control } from "@babylonjs/gui/2D/controls/control";
+import { Ellipse } from "@babylonjs/gui/2D/controls/ellipse";
 import { Rectangle } from "@babylonjs/gui/2D/controls/rectangle";
 import { StackPanel } from "@babylonjs/gui/2D/controls/stackPanel";
 import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
@@ -21,7 +22,7 @@ export interface UiDiagnosticsSnapshot {
   readonly controls: readonly UiControlDiagnostic[];
 }
 
-type DiagnosticControl = TextBlock | Button | Rectangle | StackPanel;
+type DiagnosticControl = TextBlock | Button | Rectangle | StackPanel | Ellipse;
 
 interface RegisteredControl {
   readonly id: string;

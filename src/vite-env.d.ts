@@ -68,5 +68,7 @@ interface Window {
     forceGameOver(): void;
     forceDamage(): void;
     forceCheckpoint(): void;
+    player(): import("./dev/GameTestHarness").PlayerDiagnostic | undefined;
   };
+  __mobileControlsTeardown__?: () => void;
 }

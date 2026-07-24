@@ -35,19 +35,15 @@ export class TouchInputSource implements InputSource {
     const pointerEvent = event as PointerEvent;
     const target = event.currentTarget;
     const binding = this.bindings.find((candidate) => candidate.target === target);
-    if (binding === undefined || this.pointers.has(pointerEvent.pointerId)) {
+    if (binding === undefined) {
       return;
     }
-    const wasHeld = this.isActionHeld(binding.action);
-    this.pointers.set(pointerEvent.pointerId, binding.action);
-    if (!wasHeld) {
-      this.activate(binding.action);
-    }
+    this.press(pointerEvent.pointerId, binding.action);
   };
 
   private readonly pointerUpListener = (event: Event): void => {
     const pointerEvent = event as PointerEvent;
-    this.pointers.delete(pointerEvent.pointerId);
+    this.release(pointerEvent.pointerId);
   };
 
   private readonly blurListener = (): void => this.clear();
@@ -66,6 +62,29 @@ export class TouchInputSource implements InputSource {
     target.addEventListener("pointerup", this.pointerUpListener);
     target.addEventListener("pointercancel", this.pointerUpListener);
     this.bindings.push({ action, target });
+  }
+
+  /**
+   * Begin tracking a pointer for an action. Shares the pointer/activation
+   * bookkeeping with the EventTarget path; an already-tracked id is ignored.
+   */
+  public press(pointerId: number, action: TouchAction): void {
+    if (this.pointers.has(pointerId)) {
+      return;
+    }
+    const wasHeld = this.isActionHeld(action);
+    this.pointers.set(pointerId, action);
+    if (!wasHeld) {
+      this.activate(action);
+    }
+  }
+
+  public release(pointerId: number): void {
+    this.pointers.delete(pointerId);
+  }
+
+  public cancelAll(): void {
+    this.clear();
   }
 
   public sample(): InputSnapshot {

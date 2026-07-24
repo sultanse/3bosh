@@ -8,6 +8,8 @@ import { Scene } from "@babylonjs/core/scene";
 import { DeterministicTestEngine } from "../dev/DeterministicTestEngine";
 import { GameTestHarness } from "../dev/GameTestHarness";
 import { LevelUi } from "../ui/LevelUi";
+import { MobileControls } from "../ui/MobileControls";
+import { CanvasTouchAdapter } from "../input/CanvasTouchAdapter";
 import type { UiDiagnosticsSnapshot } from "../ui/UiRoot";
 import { SaveService } from "../services/SaveService";
 import { LocalizationService } from "../services/LocalizationService";
@@ -50,6 +52,7 @@ export class GameApp {
   private loadError: Error | undefined;
   private failNextLevelLoad = false;
   private levelLoadDelayMs = 0;
+  private touchControlsOverride: boolean | undefined;
 
   public constructor(options: GameAppOptions) {
     this.canvas = options.canvas;
@@ -66,6 +69,7 @@ export class GameApp {
     const isTestLevel = level === "test";
     this.failNextLevelLoad = query.get("failLevelLoad") === "1";
     this.levelLoadDelayMs = Math.max(0, Number(query.get("levelLoadDelayMs")) || 0);
+    this.touchControlsOverride = this.parseTouchControlsOverride(query.get("touchControls"));
     const testBuild = import.meta.env.MODE === "test";
     const engine =
       (isPhysicsProbe || isTestLevel) && testBuild && Number.isFinite(renderFps) && renderFps > 0
@@ -177,6 +181,11 @@ export class GameApp {
       restartSubscription = level.onEvent("restartRequested", () => this.requestStartLevel());
       const boundLevel = level;
       const boundUi = ui;
+      const mobileControls = new MobileControls(boundUi.root, { visible: this.shouldShowTouchControls() });
+      const canvas = engine.getRenderingCanvas();
+      const touchAdapter = canvas
+        ? new CanvasTouchAdapter(canvas, mobileControls, boundLevel.touchInput)
+        : undefined;
       return {
         name: "level",
         level: boundLevel,
@@ -188,6 +197,8 @@ export class GameApp {
           scene.render();
         },
         dispose: () => {
+          touchAdapter?.dispose();
+          mobileControls.dispose();
           restartSubscription?.dispose();
           boundUi.dispose();
           boundLevel.dispose();
@@ -305,7 +316,20 @@ export class GameApp {
       },
       forceDamage: () => this.activeScene()?.level?.forceFall(),
       forceCheckpoint: () => this.activeScene()?.level?.activateCheckpoint(),
+      player: () => this.activeScene()?.level?.diagnostics(),
     };
+  }
+
+  private parseTouchControlsOverride(value: string | null): boolean | undefined {
+    if (value === "1") return true;
+    if (value === "0") return false;
+    return undefined;
+  }
+
+  private shouldShowTouchControls(): boolean {
+    if (this.touchControlsOverride !== undefined) return this.touchControlsOverride;
+    const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+    return coarse || navigator.maxTouchPoints > 0;
   }
 
   private async createLoadingScene(engine: AbstractEngine, signal: AbortSignal): Promise<RenderableScene> {

@@ -40,6 +40,7 @@ import { LEVEL_ONE } from "../gameplay/level/LevelOne";
 import type { InputSnapshot } from "../input/InputAction";
 import { InputManager } from "../input/InputManager";
 import { KeyboardInputSource } from "../input/KeyboardInputSource";
+import { TouchInputSource } from "../input/TouchInputSource";
 import { CollisionLayer, CollisionMask } from "../physics/CollisionLayers";
 import { HavokWorld } from "../physics/HavokWorld";
 import {
@@ -103,6 +104,7 @@ export class LevelScene implements GameTestTarget {
   private readonly flow = new GameFlowMachine("loadingLevel");
   private readonly playerBoundsProxy: ReturnType<typeof MeshBuilder.CreateBox>;
   private readonly testInput: GameTestInputSource | undefined;
+  private readonly touch: TouchInputSource;
   private readonly beforeStepObserver: Observer<Scene>;
   private readonly afterStepObserver: Observer<Scene>;
   private readonly disposeObserver: Observer<Scene>;
@@ -137,7 +139,10 @@ export class LevelScene implements GameTestTarget {
     void this.world.plugin;
     this.testInput = options.testMode ? new GameTestInputSource() : undefined;
     const keyboard = new KeyboardInputSource();
-    this.input = new InputManager(this.testInput ? [keyboard, this.testInput] : [keyboard]);
+    this.touch = new TouchInputSource();
+    this.input = new InputManager(
+      this.testInput ? [keyboard, this.touch, this.testInput] : [keyboard, this.touch],
+    );
     this.createEnvironment();
     this.level = LevelBuilder.build(scene, LEVEL_ONE);
     this.adapter = PhysicsCharacterAdapter.create(
@@ -259,6 +264,10 @@ export class LevelScene implements GameTestTarget {
 
   public get gameEvents(): TypedEventBus<GameEvents> {
     return this.events;
+  }
+
+  public get touchInput(): TouchInputSource {
+    return this.touch;
   }
 
   public get hudSnapshot(): { readonly health: number; readonly maxHealth: number; readonly score: number; readonly collectibles: number } {
