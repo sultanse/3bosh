@@ -4,7 +4,9 @@ test("checkpoint respawns a fallen player until the attempt ends", async ({ page
   await page.goto("/?level=test");
   await expect(page.locator("[data-boot-status]")).toHaveAttribute("data-boot-status", "ready");
 
-  await page.evaluate(() => window.__GAME_TEST_HARNESS__?.activateCheckpoint());
+  // Enter the authored checkpoint volume through the deterministic harness;
+  // activation must come from LevelScene's real Checkpoint.update() path.
+  await page.evaluate(() => window.__GAME_TEST_HARNESS__?.teleportPlayer(64, 1.5));
   await expect.poll(() => page.evaluate(() => window.__GAME_DIAGNOSTICS__?.player?.activeCheckpointId))
     .toBe("checkpoint-workshop-gate");
 
