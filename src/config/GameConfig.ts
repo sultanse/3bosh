@@ -19,6 +19,14 @@ export const GAME_CONFIG = {
     invulnerabilitySeconds: 1.25,
     respawnProtectionSeconds: 1,
   },
+  enemies: {
+    stompMinDownSpeed: 2,
+    stompTolerance: 0.1,
+    stompBounceSpeed: 6.5,
+    sideKnockbackSpeed: 5,
+    projectileCapacity: 16,
+    projectileLifetimeSeconds: 4,
+  },
   camera: {
     verticalSize: 10,
     deadZoneWidth: 3.5,

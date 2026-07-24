@@ -44,6 +44,29 @@ export interface SlotDefinition {
   readonly position: Vec3Data;
 }
 
+export interface EnemyDefinitionBase {
+  readonly id: string;
+  readonly position: Vec3Data;
+  readonly size: Size3Data;
+  readonly score: number;
+}
+
+export interface PatrolEnemyDefinition extends EnemyDefinitionBase {
+  readonly kind: "patrol";
+  readonly patrolMinX: number;
+  readonly patrolMaxX: number;
+  readonly speed: number;
+}
+
+export interface ShooterEnemyDefinition extends EnemyDefinitionBase {
+  readonly kind: "shooter";
+  readonly activationDistanceX: number;
+  readonly fireIntervalSeconds: number;
+  readonly projectileSpeed: number;
+}
+
+export type EnemyDefinition = PatrolEnemyDefinition | ShooterEnemyDefinition;
+
 export interface ParallaxLayerDefinition {
   readonly id: string;
   readonly factor: number;
@@ -70,6 +93,7 @@ export interface LevelDefinition {
   readonly goals: readonly GoalDefinition[];
   readonly hiddenAreas: readonly TriggerDefinition[];
   readonly enemySlots: readonly SlotDefinition[];
+  readonly enemies: readonly EnemyDefinition[];
   readonly itemSlots: readonly SlotDefinition[];
   readonly tutorialTriggers: readonly TriggerDefinition[];
   readonly parallaxLayers: readonly ParallaxLayerDefinition[];

@@ -1,5 +1,6 @@
 import type { Scene } from "@babylonjs/core/scene";
 import type { LevelDefinition } from "./LevelDefinition";
+import type { EnemyDefinition } from "./LevelDefinition";
 import { PlatformFactory, type BuiltPlatform } from "./PlatformFactory";
 import { MovingPlatform } from "./MovingPlatform";
 import { Hazard, type LevelTrigger } from "./Hazard";
@@ -15,6 +16,7 @@ export interface BuiltLevel {
   readonly goals: readonly Goal[];
   readonly triggers: readonly LevelTrigger[];
   readonly parallax: ParallaxBackground;
+  readonly enemies: readonly EnemyDefinition[];
   updateMovingPlatforms(stepSeconds: number): void;
   dispose(): void;
 }
@@ -36,6 +38,7 @@ export class LevelBuilder {
       goals,
       triggers,
       parallax,
+      enemies: definition.enemies,
       updateMovingPlatforms: (stepSeconds) => {
         for (const platform of movingPlatforms) platform.update(stepSeconds);
       },

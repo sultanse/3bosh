@@ -17,6 +17,7 @@ export interface GameEvents {
     readonly scoreDelta: number;
   };
   readonly enemyDefeated: { readonly enemyId: string; readonly scoreDelta: number };
+  readonly audioCueRequested: { readonly cue: "enemy-defeated" | "player-hit" | "projectile-fired" };
   readonly checkpointActivated: { readonly checkpointId: string };
   readonly levelCompleted: { readonly score: number; readonly collectibles: number };
   readonly pauseRequested: undefined;

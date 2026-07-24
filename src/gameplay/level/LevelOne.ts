@@ -40,6 +40,10 @@ export const LEVEL_ONE: LevelDefinition = {
     { id: "patrol-slot-a", position: { x: 29, y: 1, z: 0 } },
     { id: "shooter-slot-a", position: { x: 80, y: 1, z: 0 } },
   ],
+  enemies: [
+    { id: "patrol-a", kind: "patrol", position: { x: 31, y: 1, z: 0 }, size: { width: 1.1, height: 1.6, depth: 1.2 }, score: 100, patrolMinX: 27, patrolMaxX: 35, speed: 1.7 },
+    { id: "shooter-a", kind: "shooter", position: { x: 81, y: 1, z: 0 }, size: { width: 1.1, height: 1.7, depth: 1.2 }, score: 150, activationDistanceX: 13, fireIntervalSeconds: 1.1, projectileSpeed: 7 },
+  ],
   itemSlots: [
     { id: "alcove-crystal-slot", position: { x: 58, y: -1.5, z: 0 } },
     { id: "goal-crystal-slot", position: { x: 111, y: 1, z: 0 } },

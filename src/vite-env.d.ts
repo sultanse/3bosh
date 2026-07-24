@@ -24,6 +24,9 @@ interface GameDiagnostics {
     readonly jumpApexY: number;
     readonly fixedStep180?: { readonly x: number; readonly jumpApexY: number };
     readonly health?: number;
+    readonly score?: number;
+    readonly defeatedEnemies?: number;
+    readonly activeProjectiles?: number;
     readonly activeCheckpointId?: string | null;
     readonly respawnProtected?: boolean;
     readonly flowState?: import("./app/GameFlowMachine").GameFlowState;

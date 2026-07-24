@@ -1,5 +1,7 @@
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Observer } from "@babylonjs/core/Misc/observable";
@@ -25,6 +27,13 @@ import {
 } from "../gameplay/player/PlayerController";
 import { PlayerHealth } from "../gameplay/player/PlayerHealth";
 import { PlayerView } from "../gameplay/player/PlayerView";
+import { EnemyView } from "../gameplay/enemies/EnemyView";
+import { EnemyController } from "../gameplay/enemies/EnemyController";
+import { PatrolEnemy } from "../gameplay/enemies/PatrolEnemy";
+import { ShooterEnemy } from "../gameplay/enemies/ShooterEnemy";
+import { InteractionSystem } from "../gameplay/interactions/InteractionSystem";
+import type { ProjectileVisual } from "../gameplay/projectiles/Projectile";
+import { ProjectilePool } from "../gameplay/projectiles/ProjectilePool";
 import { LevelBuilder, type BuiltLevel } from "../gameplay/level/LevelBuilder";
 import { LEVEL_ONE } from "../gameplay/level/LevelOne";
 import type { InputSnapshot } from "../input/InputAction";
@@ -36,6 +45,32 @@ import {
   type CharacterMotionSnapshot,
   PhysicsCharacterAdapter,
 } from "../physics/PhysicsCharacterAdapter";
+import { PhysicsContactAdapter } from "../physics/PhysicsContactAdapter";
+
+const createProjectileVisual = (scene: Scene, index: number): ProjectileVisual => {
+  const mesh = MeshBuilder.CreateSphere(`enemy-projectile-${index}`, { diameter: 0.34 }, scene);
+  const material = new StandardMaterial(`enemy-projectile-material-${index}`, scene);
+  material.diffuseColor = new Color3(1, 0.67, 0.16);
+  material.specularColor = Color3.Black();
+  mesh.material = material;
+  mesh.isVisible = false;
+  const aggregate = new PhysicsAggregate(
+    mesh,
+    PhysicsShapeType.SPHERE,
+    { mass: 0, isTriggerShape: true },
+    scene,
+  );
+  aggregate.shape.filterMembershipMask = CollisionLayer.trigger;
+  aggregate.shape.filterCollideMask = 0;
+  return {
+    get position() { return mesh.position; },
+    setActive: (active) => { mesh.isVisible = active; },
+    setPosition: (position) => { mesh.position.copyFrom(position); },
+    setVelocity: () => undefined,
+    setCollisionEnabled: (enabled) => { aggregate.shape.filterCollideMask = enabled ? CollisionMask.trigger : 0; },
+    dispose: () => { aggregate.dispose(); mesh.dispose(false, true); },
+  };
+};
 
 export interface LevelSceneOptions {
   readonly testMode: boolean;
@@ -56,6 +91,14 @@ export class LevelScene implements GameTestTarget {
   private readonly events = new TypedEventBus<GameEvents>();
   private readonly levelSession: LevelSession;
   private readonly level: BuiltLevel;
+  private readonly contactAdapter: PhysicsContactAdapter;
+  private readonly interactions = new InteractionSystem({
+    stompMinDownSpeed: GAME_CONFIG.enemies.stompMinDownSpeed,
+    stompTolerance: GAME_CONFIG.enemies.stompTolerance,
+  });
+  private readonly enemies = new Map<string, EnemyController>();
+  private readonly enemyViews = new Map<string, EnemyView>();
+  private readonly projectilePool: ProjectilePool;
   private readonly flow = new GameFlowMachine("loadingLevel");
   private readonly playerBoundsProxy: ReturnType<typeof MeshBuilder.CreateBox>;
   private readonly testInput: GameTestInputSource | undefined;
@@ -63,6 +106,7 @@ export class LevelScene implements GameTestTarget {
   private readonly afterStepObserver: Observer<Scene>;
   private readonly disposeObserver: Observer<Scene>;
   private lastMotion: CharacterMotionSnapshot | undefined;
+  private previousStepMotion: CharacterMotionSnapshot | undefined;
   private fixedSteps = 0;
   private elapsedSeconds = 0;
   private jumpApexY = Number.NEGATIVE_INFINITY;
@@ -89,6 +133,12 @@ export class LevelScene implements GameTestTarget {
     this.adapter = PhysicsCharacterAdapter.create(
       scene,
       new Vector3(LEVEL_ONE.spawn.x, LEVEL_ONE.spawn.y, LEVEL_ONE.spawn.z),
+    );
+    this.contactAdapter = new PhysicsContactAdapter(this.world.plugin);
+    let projectileIndex = 0;
+    this.projectilePool = new ProjectilePool(
+      GAME_CONFIG.enemies.projectileCapacity,
+      () => createProjectileVisual(scene, projectileIndex++),
     );
     this.levelSession = new LevelSession(
       { id: "spawn-sunset-workshop", position: LEVEL_ONE.spawn },
@@ -129,6 +179,7 @@ export class LevelScene implements GameTestTarget {
       damping: GAME_CONFIG.camera.damping,
       camera: visualCamera,
     });
+    this.createEnemies();
     this.beforeStepObserver = scene.onBeforeStepObservable.add(() => this.beforeFixedStep());
     this.afterStepObserver = scene.onAfterStepObservable.add(() => this.afterFixedStep());
     this.disposeObserver = scene.onDisposeObservable.add(() => this.dispose());
@@ -152,6 +203,9 @@ export class LevelScene implements GameTestTarget {
         jumpApexY: Number.isFinite(this.jumpApexY) ? this.jumpApexY : 0,
         ...(this.fixedStep180 ? { fixedStep180: this.fixedStep180 } : {}),
         health: this.health.current,
+        score: this.levelSession.snapshot.score,
+        defeatedEnemies: [...this.enemies.values()].filter((enemy) => enemy.defeated).length,
+        activeProjectiles: this.projectilePool.activeCount,
         activeCheckpointId: this.levelSession.snapshot.activeCheckpointId,
         respawnProtected: this.elapsedSeconds < this.respawnProtectionUntil,
         flowState: this.flow.state,
@@ -180,7 +234,10 @@ export class LevelScene implements GameTestTarget {
     if (checkpoint) this.activateCheckpointById(checkpoint.id);
   }
 
-  public defeatEnemy(): void {}
+  public defeatEnemy(): void {
+    const enemy = this.enemies.get("patrol-a");
+    if (enemy) this.resolveStomp(enemy);
+  }
 
   public collectItem(): void {}
 
@@ -209,6 +266,10 @@ export class LevelScene implements GameTestTarget {
     this.scene.onDisposeObservable.remove(this.disposeObserver);
     this.input.dispose();
     this.events.dispose();
+    this.contactAdapter.dispose();
+    for (const enemy of this.enemies.values()) enemy.dispose();
+    for (const view of this.enemyViews.values()) view.dispose();
+    this.projectilePool.dispose();
     this.playerView.dispose();
     this.playerBoundsProxy.dispose();
     this.level.dispose();
@@ -254,6 +315,7 @@ export class LevelScene implements GameTestTarget {
     }
     const input = this.input.sample();
     const motion = this.adapter.readMotion(GAME_CONFIG.fixedStepSeconds);
+    this.previousStepMotion = motion;
     const motor = this.controller.update(
       GAME_CONFIG.fixedStepSeconds,
       input,
@@ -268,6 +330,7 @@ export class LevelScene implements GameTestTarget {
       overrideVelocityY: motor.overrideVelocityY,
       applyGravity: true,
     });
+    this.updateEnemies(this.lastMotion.position);
   }
 
   private afterFixedStep(): void {
@@ -279,6 +342,12 @@ export class LevelScene implements GameTestTarget {
     }
     this.lastMotion = this.adapter.readMotion(GAME_CONFIG.fixedStepSeconds);
     const motion = this.lastMotion;
+    if (this.previousStepMotion) {
+      this.contactAdapter.capturePlayerStep(this.previousStepMotion, motion);
+      this.processEnemyContacts();
+    }
+    this.projectilePool.update(GAME_CONFIG.fixedStepSeconds, (position) => this.isProjectileWithinLevel(position));
+    this.processProjectileContacts(motion.position);
     this.jumpApexY = Math.max(this.jumpApexY, motion.position.y);
     if (this.fixedSteps === 180) {
       this.fixedStep180 = { x: motion.position.x, jumpApexY: this.jumpApexY };
@@ -297,6 +366,133 @@ export class LevelScene implements GameTestTarget {
     const cameraCenter = this.camera.update(motion.position, GAME_CONFIG.fixedStepSeconds);
     this.level.parallax.update(cameraCenter.x);
     this.processLevelTriggers();
+  }
+
+  private createEnemies(): void {
+    for (const definition of this.level.enemies) {
+      const position = new Vector3(definition.position.x, definition.position.y, definition.position.z);
+      const enemy = definition.kind === "patrol"
+        ? new PatrolEnemy({
+            id: definition.id,
+            position,
+            patrolMinX: definition.patrolMinX,
+            patrolMaxX: definition.patrolMaxX,
+            speed: definition.speed,
+            score: definition.score,
+          })
+        : new ShooterEnemy({
+            id: definition.id,
+            position,
+            activationDistanceX: definition.activationDistanceX,
+            fireIntervalSeconds: definition.fireIntervalSeconds,
+            projectileSpeed: definition.projectileSpeed,
+            score: definition.score,
+            fire: (origin, velocity) => this.spawnProjectile(origin, velocity),
+          });
+      const view = new EnemyView(this.scene, {
+        id: definition.id,
+        kind: definition.kind,
+        position,
+        width: definition.size.width,
+        height: definition.size.height,
+        depth: definition.size.depth,
+      });
+      this.enemies.set(enemy.id, enemy);
+      this.enemyViews.set(enemy.id, view);
+      this.contactAdapter.registerEnemy(
+        enemy.id,
+        view.triggerBody,
+        () => view.bounds(),
+        () => enemy.velocity,
+        () => enemy.defeated,
+      );
+    }
+  }
+
+  private updateEnemies(playerPosition: Readonly<Vector3>): void {
+    for (const enemy of this.enemies.values()) {
+      enemy.update({
+        stepSeconds: GAME_CONFIG.fixedStepSeconds,
+        playerPosition,
+        gameplayActive: this.flow.state === "playing",
+        worldQueries: {
+          isBlockedAhead: () => false,
+          hasGroundAhead: (candidate) => this.hasGroundAt(candidate.position.x),
+        },
+      });
+      const view = this.enemyViews.get(enemy.id);
+      if (view) {
+        view.setPosition(enemy.position);
+        if (enemy instanceof PatrolEnemy) view.setFacing(enemy.direction);
+      }
+    }
+  }
+
+  private hasGroundAt(x: number): boolean {
+    return this.level.platforms.some((platform) => {
+      const bounds = platform.root.getBoundingInfo().boundingBox;
+      return x >= bounds.minimumWorld.x && x <= bounds.maximumWorld.x;
+    });
+  }
+
+  private spawnProjectile(origin: Readonly<Vector3>, velocity: Readonly<Vector3>): void {
+    const projectile = this.projectilePool.acquire();
+    if (!projectile) return;
+    projectile.launch(origin.add(new Vector3(0, 0.2, 0)), velocity, GAME_CONFIG.enemies.projectileLifetimeSeconds);
+    this.events.emit("audioCueRequested", { cue: "projectile-fired" });
+  }
+
+  private processEnemyContacts(): void {
+    for (const contact of this.contactAdapter.drainPlayerEnemyContacts()) {
+      const enemy = this.enemies.get(contact.enemyId);
+      if (!enemy) continue;
+      const interaction = this.interactions.classify(contact);
+      if (interaction === "stomp") {
+        this.resolveStomp(enemy);
+      } else if (interaction === "side") {
+        const knockback = contact.currentPlayerBounds.minX < contact.enemyBounds.minX
+          ? -GAME_CONFIG.enemies.sideKnockbackSpeed
+          : GAME_CONFIG.enemies.sideKnockbackSpeed;
+        this.applyContactDamage("enemy", knockback);
+      }
+    }
+  }
+
+  private resolveStomp(enemy: EnemyController): void {
+    const outcome = enemy.takeDamage(1, "stomp");
+    if (!outcome.defeated) return;
+    this.enemyViews.get(enemy.id)?.setDefeated();
+    this.levelSession.addScore(enemy.score);
+    this.controller.queueVerticalImpulse(GAME_CONFIG.enemies.stompBounceSpeed);
+    this.events.emit("enemyDefeated", { enemyId: enemy.id, scoreDelta: enemy.score });
+    this.events.emit("audioCueRequested", { cue: "enemy-defeated" });
+    this.camera.shake(0.18, 0.15);
+  }
+
+  private processProjectileContacts(playerPosition: Readonly<Vector3>): void {
+    for (const projectile of this.projectilePool.activeProjectiles) {
+      const dx = projectile.position.x - playerPosition.x;
+      const dy = projectile.position.y - playerPosition.y;
+      if (Math.abs(dx) > GAME_CONFIG.player.radius + 0.17 || Math.abs(dy) > GAME_CONFIG.player.height / 2 + 0.17) continue;
+      projectile.deactivateWithGrace();
+      this.applyContactDamage("projectile", dx < 0 ? GAME_CONFIG.enemies.sideKnockbackSpeed : -GAME_CONFIG.enemies.sideKnockbackSpeed);
+    }
+  }
+
+  private isProjectileWithinLevel(position: Readonly<Vector3>): boolean {
+    return position.x >= LEVEL_ONE.cameraBounds.minX - 4 &&
+      position.x <= LEVEL_ONE.cameraBounds.maxX + 4 &&
+      position.y >= LEVEL_ONE.fallThresholdY - 3 &&
+      position.y <= LEVEL_ONE.cameraBounds.maxY + 8;
+  }
+
+  private applyContactDamage(source: "enemy" | "projectile", horizontalKnockback: number): void {
+    const outcome = this.health.damage(1, source, this.elapsedSeconds);
+    if (!outcome.applied) return;
+    this.playerView.flashDamage(0.2);
+    this.controller.queueHorizontalKnockback(horizontalKnockback);
+    this.events.emit("audioCueRequested", { cue: "player-hit" });
+    if (outcome.died) this.flow.transition("gameOver");
   }
 
   private respawnProtectionUntil = Number.NEGATIVE_INFINITY;

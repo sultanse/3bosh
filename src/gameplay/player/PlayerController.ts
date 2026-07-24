@@ -119,6 +119,10 @@ export class PlayerController {
     this.queuedVerticalImpulse = value;
   }
 
+  public queueHorizontalKnockback(value: number): void {
+    this.horizontalVelocity = value;
+  }
+
   public enterHurt(untilSeconds: number): void {
     this.hurtUntilSeconds = untilSeconds;
     if (!this.dead) {
