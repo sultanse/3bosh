@@ -7,6 +7,8 @@ import { Hazard, type LevelTrigger } from "./Hazard";
 import { Checkpoint } from "./Checkpoint";
 import { Goal } from "./Goal";
 import { ParallaxBackground } from "./ParallaxBackground";
+import { ItemFactory } from "../items/ItemFactory";
+import type { CollectibleItem } from "../items/Collectible";
 
 export interface BuiltLevel {
   readonly platforms: readonly BuiltPlatform[];
@@ -17,6 +19,8 @@ export interface BuiltLevel {
   readonly triggers: readonly LevelTrigger[];
   readonly parallax: ParallaxBackground;
   readonly enemies: readonly EnemyDefinition[];
+  readonly items: readonly CollectibleItem[];
+  updateItems(stepSeconds: number): void;
   updateMovingPlatforms(stepSeconds: number): void;
   dispose(): void;
 }
@@ -29,6 +33,8 @@ export class LevelBuilder {
     const checkpoints = definition.checkpoints.map((entry) => new Checkpoint(entry));
     const goals = definition.goals.map((entry) => new Goal(entry));
     const parallax = new ParallaxBackground(scene, definition.parallaxLayers);
+    const itemFactory = new ItemFactory(scene);
+    const items = definition.itemSlots.map((entry) => itemFactory.create(entry));
     const triggers: readonly LevelTrigger[] = [...hazards, ...checkpoints, ...goals];
     return {
       platforms,
@@ -39,13 +45,19 @@ export class LevelBuilder {
       triggers,
       parallax,
       enemies: definition.enemies,
+      items,
       updateMovingPlatforms: (stepSeconds) => {
         for (const platform of movingPlatforms) platform.update(stepSeconds);
+      },
+      updateItems: (stepSeconds) => {
+        for (const item of items) item.update(stepSeconds);
       },
       dispose: () => {
         for (const platform of movingPlatforms) platform.dispose();
         for (const platform of platforms) platform.dispose();
         for (const trigger of triggers) trigger.dispose();
+        for (const item of items) item.dispose();
+        itemFactory.dispose();
         parallax.dispose();
       },
     };

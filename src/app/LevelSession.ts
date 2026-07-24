@@ -1,5 +1,6 @@
 import type { GameEvents } from "../core/TypedEventBus";
 import { TypedEventBus } from "../core/TypedEventBus";
+import type { PlayerHealth } from "../gameplay/player/PlayerHealth";
 
 export interface Checkpoint {
   readonly id: string;
@@ -17,6 +18,16 @@ export interface LevelSessionSnapshot {
 
 type CollectibleKind = GameEvents["collectibleCollected"]["kind"];
 
+export type CollectionEffect =
+  | { readonly kind: "crystal"; readonly score: number }
+  | { readonly kind: "health"; readonly healAmount: number }
+  | { readonly kind: "shield"; readonly durationSeconds: number };
+
+export interface CollectResult {
+  readonly collected: boolean;
+  readonly scoreDelta: number;
+}
+
 const copyPosition = (position: Checkpoint["position"]): Readonly<{ x: number; y: number; z: number }> => ({ ...position });
 
 export class LevelSession {
@@ -28,7 +39,12 @@ export class LevelSession {
   private activeCheckpointPosition: Readonly<{ x: number; y: number; z: number }>;
   private goalReached = false;
 
-  public constructor(spawnCheckpoint: Checkpoint, private readonly events: TypedEventBus<GameEvents>) {
+  public constructor(
+    spawnCheckpoint: Checkpoint,
+    private readonly events: TypedEventBus<GameEvents>,
+    private readonly health?: PlayerHealth,
+    private readonly nowSeconds: () => number = () => 0,
+  ) {
     this.activeCheckpointId = spawnCheckpoint.id;
     this.activeCheckpointPosition = copyPosition(spawnCheckpoint.position);
     this.activatedCheckpointIds = new Set([spawnCheckpoint.id]);
@@ -57,17 +73,32 @@ export class LevelSession {
     return true;
   }
 
-  public collect(itemId: string, kind: CollectibleKind, scoreDelta: number): boolean {
-    if (!Number.isFinite(scoreDelta) || !Number.isInteger(scoreDelta) || scoreDelta < 0 || this.collectedItemIds.has(itemId)) {
-      return false;
+  public collect(itemId: string, effect: CollectionEffect): CollectResult;
+  /** @deprecated Use the typed CollectionEffect overload. */
+  public collect(itemId: string, kind: CollectibleKind, scoreDelta: number): boolean;
+  public collect(
+    itemId: string,
+    effectOrKind: CollectionEffect | CollectibleKind,
+    legacyScoreDelta?: number,
+  ): CollectResult | boolean {
+    if (typeof effectOrKind === "string") {
+      return this.collectLegacy(itemId, effectOrKind, legacyScoreDelta);
+    }
+    if (itemId.length === 0 || this.collectedItemIds.has(itemId)) {
+      return { collected: false, scoreDelta: 0 };
+    }
+
+    const scoreDelta = this.applyEffect(effectOrKind);
+    if (scoreDelta === null) {
+      return { collected: false, scoreDelta: 0 };
     }
 
     this.collectedItemIds.add(itemId);
     this.collectibles += 1;
     this.score += scoreDelta;
-    this.events.emit("collectibleCollected", { kind, scoreDelta });
+    this.events.emit("collectibleCollected", { kind: effectOrKind.kind, scoreDelta });
     this.events.emit("scoreChanged", { score: this.score, collectibles: this.collectibles });
-    return true;
+    return { collected: true, scoreDelta };
   }
 
   public addScore(scoreDelta: number): boolean {
@@ -88,5 +119,35 @@ export class LevelSession {
     this.goalReached = true;
     this.events.emit("levelCompleted", { score: this.score, collectibles: this.collectibles });
     return true;
+  }
+
+  private collectLegacy(itemId: string, kind: CollectibleKind, scoreDelta: number | undefined): boolean {
+    if (scoreDelta === undefined || !Number.isFinite(scoreDelta) || !Number.isInteger(scoreDelta) || scoreDelta < 0 || this.collectedItemIds.has(itemId)) {
+      return false;
+    }
+    this.collectedItemIds.add(itemId);
+    this.collectibles += 1;
+    this.score += scoreDelta;
+    this.events.emit("collectibleCollected", { kind, scoreDelta });
+    this.events.emit("scoreChanged", { score: this.score, collectibles: this.collectibles });
+    return true;
+  }
+
+  private applyEffect(effect: CollectionEffect): number | null {
+    if (effect.kind === "crystal") {
+      return Number.isFinite(effect.score) && Number.isInteger(effect.score) && effect.score >= 0 ? effect.score : null;
+    }
+    if (this.health === undefined) {
+      return null;
+    }
+    if (effect.kind === "health") {
+      if (!Number.isFinite(effect.healAmount) || effect.healAmount <= 0 || this.health.current >= this.health.maximum) return null;
+      const previous = this.health.current;
+      this.health.heal(effect.healAmount);
+      return this.health.current > previous ? 0 : null;
+    }
+    if (!Number.isFinite(effect.durationSeconds) || effect.durationSeconds <= 0) return null;
+    this.health.grantShield(effect.durationSeconds, this.nowSeconds());
+    return 0;
   }
 }

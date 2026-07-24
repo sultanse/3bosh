@@ -147,11 +147,6 @@ export class LevelScene implements GameTestTarget {
       GAME_CONFIG.enemies.projectileCapacity,
       () => createProjectileVisual(scene, projectileIndex++),
     );
-    this.levelSession = new LevelSession(
-      { id: "spawn-sunset-workshop", position: LEVEL_ONE.spawn },
-      this.events,
-    );
-    this.flow.transition("playing");
     this.playerBoundsProxy = MeshBuilder.CreateBox(
       "player-trigger-proxy",
       { width: GAME_CONFIG.player.radius * 2, height: GAME_CONFIG.player.height, depth: GAME_CONFIG.player.radius * 2 },
@@ -172,6 +167,13 @@ export class LevelScene implements GameTestTarget {
         },
       },
     );
+    this.levelSession = new LevelSession(
+      { id: "spawn-sunset-workshop", position: LEVEL_ONE.spawn },
+      this.events,
+      this.health,
+      () => this.elapsedSeconds,
+    );
+    this.flow.transition("playing");
     const cameraCenter = new Vector3(0, 3, -20);
     const visualCamera = SideCameraController.createCamera(scene, "level-camera", cameraCenter, GAME_CONFIG.camera.verticalSize);
     const aspect = scene.getEngine().getRenderWidth() / Math.max(1, scene.getEngine().getRenderHeight());
@@ -211,6 +213,7 @@ export class LevelScene implements GameTestTarget {
         ...(this.fixedStep180 ? { fixedStep180: this.fixedStep180 } : {}),
         health: this.health.current,
         score: this.levelSession.snapshot.score,
+        collectibles: this.levelSession.snapshot.collectibles,
         defeatedEnemies: [...this.enemies.values()].filter((enemy) => enemy.defeated).length,
         activeProjectiles: this.projectilePool.activeCount,
         inactiveReservedProjectiles: this.projectilePool.inactiveReservedCount,
@@ -274,7 +277,9 @@ export class LevelScene implements GameTestTarget {
     );
   }
 
-  public collectItem(): void {}
+  public collectItem(): void {
+    this.processItems();
+  }
 
   public reachGoal(): void {
     if (this.levelSession.completeGoal() && this.flow.state === "playing") this.flow.transition("victory");
@@ -344,6 +349,7 @@ export class LevelScene implements GameTestTarget {
     this.fixedSteps += 1;
     this.elapsedSeconds += GAME_CONFIG.fixedStepSeconds;
     this.level.updateMovingPlatforms(GAME_CONFIG.fixedStepSeconds);
+    this.level.updateItems(GAME_CONFIG.fixedStepSeconds);
     if (this.fixedSteps === this.scheduledJumpAtStep) {
       this.testInput?.set({ jumpPressed: true });
       this.scheduledJumpAtStep = undefined;
@@ -406,6 +412,7 @@ export class LevelScene implements GameTestTarget {
     const cameraCenter = this.camera.update(motion.position, GAME_CONFIG.fixedStepSeconds);
     this.level.parallax.update(cameraCenter.x);
     this.processLevelTriggers();
+    this.processItems();
   }
 
   private createEnemies(): void {
@@ -596,6 +603,16 @@ export class LevelScene implements GameTestTarget {
         this.flow.transition("victory");
         return;
       }
+    }
+  }
+
+  private processItems(): void {
+    for (const item of this.level.items) {
+      item.tryCollect(this.playerBoundsProxy.getBoundingInfo(), {
+        level: this.levelSession,
+        health: this.health,
+        nowSeconds: this.elapsedSeconds,
+      });
     }
   }
 

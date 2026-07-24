@@ -12,6 +12,7 @@ export interface PlayerDiagnostic {
   readonly fixedStep180?: { readonly x: number; readonly jumpApexY: number };
   readonly health?: number;
   readonly score?: number;
+  readonly collectibles?: number;
   readonly defeatedEnemies?: number;
   readonly activeProjectiles?: number;
   readonly projectilesFired?: number;

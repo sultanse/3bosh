@@ -45,8 +45,10 @@ export const LEVEL_ONE: LevelDefinition = {
     { id: "shooter-a", kind: "shooter", position: { x: 81, y: 1, z: 0 }, size: { width: 1.1, height: 1.7, depth: 1.2 }, score: 150, activationDistanceX: 13, fireIntervalSeconds: 1.1, projectileSpeed: 7 },
   ],
   itemSlots: [
-    { id: "alcove-crystal-slot", position: { x: 58, y: -1.5, z: 0 } },
-    { id: "goal-crystal-slot", position: { x: 111, y: 1, z: 0 } },
+    { id: "alcove-crystal-slot", kind: "crystal", score: 75, position: { x: 58, y: -1.5, z: 0 } },
+    { id: "approach-health-slot", kind: "health", position: { x: 72, y: 1, z: 0 } },
+    { id: "workshop-shield-slot", kind: "shield", durationSeconds: 8, position: { x: 86, y: 1, z: 0 } },
+    { id: "goal-crystal-slot", kind: "crystal", score: 50, position: { x: 111, y: 1, z: 0 } },
   ],
   tutorialTriggers: [
     { id: "tutorial-move", position: { x: 5, y: 2, z: 0 }, size: { width: 4, height: 3, depth: 2 } },

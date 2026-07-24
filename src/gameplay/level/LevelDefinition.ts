@@ -44,6 +44,22 @@ export interface SlotDefinition {
   readonly position: Vec3Data;
 }
 
+export interface CrystalItemDefinition extends SlotDefinition {
+  readonly kind: "crystal";
+  readonly score: number;
+}
+
+export interface HealthItemDefinition extends SlotDefinition {
+  readonly kind: "health";
+}
+
+export interface ShieldItemDefinition extends SlotDefinition {
+  readonly kind: "shield";
+  readonly durationSeconds: number;
+}
+
+export type ItemDefinition = CrystalItemDefinition | HealthItemDefinition | ShieldItemDefinition;
+
 export interface EnemyDefinitionBase {
   readonly id: string;
   readonly position: Vec3Data;
@@ -94,7 +110,7 @@ export interface LevelDefinition {
   readonly hiddenAreas: readonly TriggerDefinition[];
   readonly enemySlots: readonly SlotDefinition[];
   readonly enemies: readonly EnemyDefinition[];
-  readonly itemSlots: readonly SlotDefinition[];
+  readonly itemSlots: readonly ItemDefinition[];
   readonly tutorialTriggers: readonly TriggerDefinition[];
   readonly parallaxLayers: readonly ParallaxLayerDefinition[];
 }
