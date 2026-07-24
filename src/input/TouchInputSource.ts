@@ -3,7 +3,7 @@ import {
   type InputAction,
   type InputSnapshot,
 } from "./InputAction";
-import type { InputSource } from "./InputManager";
+import type { InputEdgeRevisions, InputSource } from "./InputManager";
 
 type TouchAction = InputAction;
 
@@ -27,6 +27,9 @@ export class TouchInputSource implements InputSource {
   private jumpPressed = false;
   private pausePressed = false;
   private restartPressed = false;
+  private jumpPressedRevision = 0;
+  private pausePressedRevision = 0;
+  private restartPressedRevision = 0;
 
   private readonly pointerDownListener = (event: Event): void => {
     const pointerEvent = event as PointerEvent;
@@ -88,6 +91,14 @@ export class TouchInputSource implements InputSource {
         : 0;
   }
 
+  public getEdgeRevisions(): InputEdgeRevisions {
+    return {
+      jumpPressed: this.jumpPressedRevision,
+      pausePressed: this.pausePressedRevision,
+      restartPressed: this.restartPressedRevision,
+    };
+  }
+
   public clear(): void {
     this.pointers.clear();
     this.directionActivations.clear();
@@ -115,12 +126,15 @@ export class TouchInputSource implements InputSource {
         break;
       case "jump":
         this.jumpPressed = true;
+        this.jumpPressedRevision = nextInputActivationOrder();
         break;
       case "pause":
         this.pausePressed = true;
+        this.pausePressedRevision = nextInputActivationOrder();
         break;
       case "restart":
         this.restartPressed = true;
+        this.restartPressedRevision = nextInputActivationOrder();
         break;
     }
   }

@@ -137,6 +137,6 @@ describe("InputManager", () => {
     const manager = new InputManager([source]);
 
     expect(manager.sample()).toMatchObject({ moveAxis: -1, jumpPressed: true, jumpHeld: true });
-    expect(manager.sample()).toMatchObject({ moveAxis: -1, jumpPressed: true, jumpHeld: true });
+    expect(manager.sample()).toMatchObject({ moveAxis: -1, jumpPressed: false, jumpHeld: true });
   });
 });

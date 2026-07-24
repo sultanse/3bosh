@@ -3,7 +3,7 @@ import {
   type InputAction,
   type InputSnapshot,
 } from "./InputAction";
-import type { InputSource } from "./InputManager";
+import type { InputEdgeRevisions, InputSource } from "./InputManager";
 
 const keyActions: Readonly<Record<string, InputAction>> = {
   KeyA: "left",
@@ -23,6 +23,9 @@ export class KeyboardInputSource implements InputSource {
   private jumpPressed = false;
   private pausePressed = false;
   private restartPressed = false;
+  private jumpPressedRevision = 0;
+  private pausePressedRevision = 0;
+  private restartPressedRevision = 0;
 
   private readonly keyDownListener = (event: Event): void => {
     const keyboardEvent = event as KeyboardEvent;
@@ -76,6 +79,14 @@ export class KeyboardInputSource implements InputSource {
     return 0;
   }
 
+  public getEdgeRevisions(): InputEdgeRevisions {
+    return {
+      jumpPressed: this.jumpPressedRevision,
+      pausePressed: this.pausePressedRevision,
+      restartPressed: this.restartPressedRevision,
+    };
+  }
+
   public clear(): void {
     this.heldKeys.clear();
     this.directionActivations.clear();
@@ -99,12 +110,15 @@ export class KeyboardInputSource implements InputSource {
         break;
       case "jump":
         this.jumpPressed = true;
+        this.jumpPressedRevision = nextInputActivationOrder();
         break;
       case "pause":
         this.pausePressed = true;
+        this.pausePressedRevision = nextInputActivationOrder();
         break;
       case "restart":
         this.restartPressed = true;
+        this.restartPressedRevision = nextInputActivationOrder();
         break;
     }
   }
