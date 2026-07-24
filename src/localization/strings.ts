@@ -1,0 +1,31 @@
+export const STRINGS = {
+  menuPlay: "menuPlay",
+  menuSettings: "menuSettings",
+  menuQuit: "menuQuit",
+  hudScore: "hudScore",
+  hudCollectibles: "hudCollectibles",
+  hudHealth: "hudHealth",
+  tutorialMove: "tutorialMove",
+  tutorialJump: "tutorialJump",
+  tutorialPause: "tutorialPause",
+  errorLoadLevel: "errorLoadLevel",
+  errorSaveData: "errorSaveData",
+  victoryTitle: "victoryTitle",
+  victoryContinue: "victoryContinue",
+  gameOverTitle: "gameOverTitle",
+  gameOverRetry: "gameOverRetry",
+  audioTitle: "audioTitle",
+  audioMusic: "audioMusic",
+  audioSfx: "audioSfx",
+  audioMute: "audioMute",
+  clearData: "clearData",
+  clearDataConfirm: "clearDataConfirm",
+  controlLeft: "controlLeft",
+  controlRight: "controlRight",
+  controlJump: "controlJump",
+  controlAttack: "controlAttack",
+  controlPause: "controlPause",
+} as const;
+
+export type StringKey = keyof typeof STRINGS;
+export type TranslationDictionary = Readonly<Record<StringKey, string>>;
