@@ -20,6 +20,7 @@ import {
   type PlayerDiagnostic,
 } from "../dev/GameTestHarness";
 import { TypedEventBus, type GameEvents } from "../core/TypedEventBus";
+import type { DisposableLike } from "../core/DisposableBag";
 import { SideCameraController } from "../gameplay/camera/SideCameraController";
 import {
   PlayerController,
@@ -114,6 +115,7 @@ export class LevelScene implements GameTestTarget {
   private scheduledJumpAtStep: number | undefined;
   private projectilesFired = 0;
   private readonly projectileFireTimes: number[] = [];
+  private readonly seenTutorialIds = new Set<string>();
   private lastProjectileContactReason: "world" | "player" | undefined;
   private lastProjectileContactAtSeconds: number | undefined;
   private lastProjectileReleasedAtSeconds: number | undefined;
@@ -245,6 +247,36 @@ export class LevelScene implements GameTestTarget {
     };
   }
 
+  public get flowState(): GameFlowMachine["state"] {
+    return this.flow.state;
+  }
+
+  public get gameEvents(): TypedEventBus<GameEvents> {
+    return this.events;
+  }
+
+  public get hudSnapshot(): { readonly health: number; readonly maxHealth: number; readonly score: number; readonly collectibles: number } {
+    const snapshot = this.levelSession.snapshot;
+    return {
+      health: this.health.current,
+      maxHealth: this.health.maximum,
+      score: snapshot.score,
+      collectibles: snapshot.collectibles,
+    };
+  }
+
+  public onEvent<K extends keyof GameEvents>(key: K, listener: (payload: GameEvents[K]) => void): DisposableLike {
+    return this.events.on(key, listener);
+  }
+
+  public pause(): void {
+    if (this.flow.state === "playing") this.flow.transition("paused");
+  }
+
+  public resume(): void {
+    if (this.flow.state === "paused") this.flow.transition("playing");
+  }
+
   public setInput(input: Partial<InputSnapshot>): void {
     this.testInput?.set(input);
   }
@@ -345,6 +377,10 @@ export class LevelScene implements GameTestTarget {
   }
 
   private beforeFixedStep(): void {
+    if (this.flow.state === "paused") {
+      if (this.input.sample().pausePressed) this.resume();
+      return;
+    }
     if (this.flow.state !== "playing") return;
     this.fixedSteps += 1;
     this.elapsedSeconds += GAME_CONFIG.fixedStepSeconds;
@@ -355,6 +391,15 @@ export class LevelScene implements GameTestTarget {
       this.scheduledJumpAtStep = undefined;
     }
     const input = this.input.sample();
+    if (input.pausePressed) {
+      this.pause();
+      this.events.emit("pauseRequested", undefined);
+      return;
+    }
+    if (input.restartPressed) {
+      this.events.emit("restartRequested", undefined);
+      return;
+    }
     const motion = this.adapter.readMotion(GAME_CONFIG.fixedStepSeconds);
     this.previousStepMotion = motion;
     const motor = this.controller.update(
@@ -412,6 +457,7 @@ export class LevelScene implements GameTestTarget {
     const cameraCenter = this.camera.update(motion.position, GAME_CONFIG.fixedStepSeconds);
     this.level.parallax.update(cameraCenter.x);
     this.processLevelTriggers();
+    this.processTutorialTriggers();
     this.processItems();
   }
 
@@ -612,6 +658,23 @@ export class LevelScene implements GameTestTarget {
         level: this.levelSession,
         health: this.health,
         nowSeconds: this.elapsedSeconds,
+      });
+    }
+  }
+
+  private processTutorialTriggers(): void {
+    const position = this.lastMotion?.position;
+    if (!position) return;
+    for (const tutorial of LEVEL_ONE.tutorialTriggers) {
+      if (this.seenTutorialIds.has(tutorial.id)) continue;
+      const halfWidth = tutorial.size.width / 2;
+      const halfHeight = tutorial.size.height / 2;
+      if (Math.abs(position.x - tutorial.position.x) > halfWidth || Math.abs(position.y - tutorial.position.y) > halfHeight) continue;
+      this.seenTutorialIds.add(tutorial.id);
+      this.events.emit("tutorialRequested", {
+        id: tutorial.id,
+        messageKey: tutorial.messageKey,
+        durationSeconds: tutorial.durationSeconds,
       });
     }
   }

@@ -1,4 +1,13 @@
 export const STRINGS = {
+  gameTitle: "gameTitle",
+  startGame: "startGame",
+  resume: "resume",
+  restartLevel: "restartLevel",
+  returnToMenu: "returnToMenu",
+  victoryMessage: "victoryMessage",
+  gameOverMessage: "gameOverMessage",
+  clearSavedData: "clearSavedData",
+  pause: "pause",
   menuPlay: "menuPlay",
   menuSettings: "menuSettings",
   menuQuit: "menuQuit",

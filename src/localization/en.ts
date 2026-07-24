@@ -1,6 +1,15 @@
 import type { TranslationDictionary } from "./strings";
 
 export const en: TranslationDictionary = {
+  gameTitle: "Sunset Workshop",
+  startGame: "Start Game",
+  resume: "Resume",
+  restartLevel: "Restart Level",
+  returnToMenu: "Main Menu",
+  victoryMessage: "Well done! You reached the gate",
+  gameOverMessage: "Attempt over",
+  clearSavedData: "Clear Saved Data",
+  pause: "Pause",
   menuPlay: "Play",
   menuSettings: "Settings",
   menuQuit: "Quit",

@@ -51,8 +51,8 @@ export const LEVEL_ONE: LevelDefinition = {
     { id: "goal-crystal-slot", kind: "crystal", score: 50, position: { x: 111, y: 1, z: 0 } },
   ],
   tutorialTriggers: [
-    { id: "tutorial-move", position: { x: 5, y: 2, z: 0 }, size: { width: 4, height: 3, depth: 2 } },
-    { id: "tutorial-jump", position: { x: 13, y: 2, z: 0 }, size: { width: 2, height: 3, depth: 2 } },
+    { id: "tutorial-move", position: { x: 5, y: 2, z: 0 }, size: { width: 4, height: 3, depth: 2 }, messageKey: "tutorialMove", durationSeconds: 3 },
+    { id: "tutorial-jump", position: { x: 13, y: 2, z: 0 }, size: { width: 2, height: 3, depth: 2 }, messageKey: "tutorialJump", durationSeconds: 3 },
   ],
   parallaxLayers: [
     { id: "sunset-sky", factor: 0.05, y: 6, color: "#f7a35c" },

@@ -61,4 +61,10 @@ interface GameTestHarness {
 interface Window {
   __GAME_DIAGNOSTICS__?: GameDiagnostics;
   __GAME_TEST_HARNESS__?: GameTestHarness;
+  __GAME_UI_HARNESS__?: {
+    diagnostics(): import("./app/GameApp").GameUiHarnessDiagnostics;
+    activate(id: string): boolean;
+    forceVictory(): void;
+    forceGameOver(): void;
+  };
 }

@@ -97,6 +97,11 @@ export interface CameraBounds {
   readonly maxY: number;
 }
 
+export interface TutorialTriggerDefinition extends TriggerDefinition {
+  readonly messageKey: "tutorialMove" | "tutorialJump" | "tutorialPause";
+  readonly durationSeconds: number;
+}
+
 export interface LevelDefinition {
   readonly id: string;
   readonly spawn: Vec3Data;
@@ -111,6 +116,6 @@ export interface LevelDefinition {
   readonly enemySlots: readonly SlotDefinition[];
   readonly enemies: readonly EnemyDefinition[];
   readonly itemSlots: readonly ItemDefinition[];
-  readonly tutorialTriggers: readonly TriggerDefinition[];
+  readonly tutorialTriggers: readonly TutorialTriggerDefinition[];
   readonly parallaxLayers: readonly ParallaxLayerDefinition[];
 }
