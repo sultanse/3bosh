@@ -11,10 +11,18 @@ test("the Arabic game UI routes menu, pause, restart, victory and game-over acti
   await expect(page.locator("[data-boot-status]")).toHaveAttribute("data-boot-status", "ready");
   await expect.poll(() => ui(page)).toMatchObject({ flowState: "menu" });
   expect(await label(page, "start-game")).toBe("ابدأ اللعب");
+  expect(await label(page, "open-settings")).toBe("الإعدادات");
+  expect(await activate(page, "open-settings")).toBe(true);
+  expect(await label(page, "clear-saved-data")).toBe("مسح البيانات المحفوظة");
+  expect(await label(page, "close-settings")).toBe("القائمة الرئيسية");
+  expect(await activate(page, "clear-saved-data")).toBe(true);
+  expect(await activate(page, "close-settings")).toBe(true);
+  expect(await label(page, "start-game")).toBe("ابدأ اللعب");
   expect((await page.screenshot()).byteLength).toBeGreaterThan(1_000);
 
   expect(await activate(page, "start-game")).toBe(true);
   await expect.poll(() => ui(page)).toMatchObject({ flowState: "playing" });
+  expect(await label(page, "hud-pause")).toBe("إيقاف مؤقت");
   expect(await activate(page, "hud-pause")).toBe(true);
   await expect.poll(() => ui(page)).toMatchObject({ flowState: "paused" });
   await expect.poll(() => label(page, "resume")).toBe("متابعة");

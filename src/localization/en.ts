@@ -17,7 +17,7 @@ export const en: TranslationDictionary = {
   hudScore: "Score",
   hudCollectibles: "Collectibles",
   hudHealth: "Health",
-  tutorialMove: "Move",
+  tutorialMove: "Use the movement controls to cross the Sunset Workshop safely and reach the gate.",
   tutorialJump: "Jump",
   tutorialPause: "Pause",
   errorLoadLevel: "Unable to load level",

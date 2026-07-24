@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 interface Bounds { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
-interface Control { readonly id: string; readonly text: string | null; readonly visible: boolean; readonly pixelBounds: Bounds }
+interface Control { readonly id: string; readonly text: string | null; readonly visible: boolean; readonly pixelBounds: Bounds; readonly lineCount?: number }
 
 const visible = (controls: readonly Control[], id: string): Control => {
   const control = controls.find((entry) => entry.id === id);
@@ -41,7 +41,9 @@ test("RTL HUD and end controls stay contained with tutorial text wrapped", async
   expectContained(flash, diagnostic?.viewport ?? { width: 0, height: 0 });
   const tutorial = visible(controls, "tutorial-message");
   expect(tutorial.visible).toBe(true);
-  expect(tutorial.text).toBe("تحرك");
+  expect(tutorial.text).toContain("استخدم أسهم الاتجاهات");
+  expect(tutorial.lineCount).toBeGreaterThan(1);
+  expect(tutorial.pixelBounds.height).toBeGreaterThanOrEqual((tutorial.lineCount ?? 0) * 22);
   expectContained(tutorial, diagnostic?.viewport ?? { width: 0, height: 0 });
 
   await page.keyboard.press("Escape");

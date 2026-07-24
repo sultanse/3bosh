@@ -12,6 +12,7 @@ export interface UiControlDiagnostic {
   readonly text: string | null;
   readonly visible: boolean;
   readonly pixelBounds: Readonly<{ x: number; y: number; width: number; height: number }>;
+  readonly lineCount?: number;
 }
 
 export interface UiDiagnosticsSnapshot {
@@ -117,6 +118,7 @@ export class UiRoot {
           width: control._currentMeasure.width,
           height: control._currentMeasure.height,
         },
+        ...(control instanceof TextBlock ? { lineCount: control.lines?.length ?? 0 } : {}),
       })),
     };
   }

@@ -8,8 +8,9 @@ export class TutorialOverlay {
 
   public constructor(root: UiRoot) {
     this.text = root.createText("tutorial-message", "", 22);
-    this.text.width = "72%";
-    this.text.height = "84px";
+    this.text.width = "300px";
+    this.text.height = "132px";
+    this.text.textWrapping = true;
     this.text.top = "-24%";
     this.text.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     this.text.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
